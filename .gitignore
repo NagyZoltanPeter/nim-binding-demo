@@ -1,0 +1,14 @@
+# Ignore build directory and all its contents
+**/build/*
+**/bin/*
+**/lib/*
+**/CMakeFiles/*
+# Ignore all files in proto directory except .proto files
+proto/[!.]**
+!proto/**/*.proto
+*.pb.*
+nimble.develop
+nimble.paths
+nimbledeps
+Makefile
+cmake_install.cmake
