@@ -15,5 +15,5 @@ message WakuMessage {
 
 
 message callSend {
-  WakuMessage msg = 1
-};
+  WakuMessage msg = 1;
+}
