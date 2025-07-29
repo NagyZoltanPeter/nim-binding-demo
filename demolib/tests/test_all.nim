@@ -1,1 +1,1 @@
-import test_message
+import test_message, test_demolib

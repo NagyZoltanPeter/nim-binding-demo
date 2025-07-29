@@ -123,10 +123,7 @@ task test, "Run all tests":
 
   if found:
     echo "Using test path: " & testPath
-    for threads in ["--threads:off", "--threads:on"]:
-      echo "Running with threads option: " & threads
-      # run(threads, testPath)
-      exec nimc & " " & lang & " --out:build/ " & threads & " -r " & testPath
+    exec nimc & " " & lang & " --out:build/ " & " --threads:on " & " -r " & testPath
   else:
     echo "ERROR: Test file not found in any of the checked locations"
     echo "Listing current directory:"

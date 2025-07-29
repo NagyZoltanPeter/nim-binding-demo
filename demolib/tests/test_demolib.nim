@@ -6,6 +6,24 @@
 # To run these tests, simply execute `nimble test`.
 
 import unittest
+import os
+import stew/byteutils
+import protobuf_serialization
 
+import message
 import demolib
 
+test "dispatch calls":
+  var msg =
+    WakuMessage(payload: "Test message".toBytes(), content_topic: "/zoltan/1/demo/0")
+  let encoded = Protobuf.encode(msg)
+
+  # Get pointer and length from the encoded sequence
+  let encodedPtr = cast[pointer](unsafeAddr encoded[0])
+  let encodedLen = cint(encoded.len)
+
+  # Call the exec procedure with "Send" command and the encoded message
+  exec("Send", encodedPtr, encodedLen)
+
+  # Sleep briefly to allow the message to be processed
+  sleep(100)

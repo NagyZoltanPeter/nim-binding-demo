@@ -2,16 +2,16 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import demolib/[context, message]
 import stew/byteutils, chronos, times
+import message
 
-var managedMsgs: seq[WakuMessage]
+var managedMsgs {.threadvar.}: seq[WakuMessage]
 
 # Define the callback type
-type MessageCallback* = proc(msg: WakuMessage) {.gcsafe.}
+type MessageCallback* = proc(msg: WakuMessage) {.raises: [], gcsafe.}
 
 # Global registry for callbacks
-var messageCallbacks: seq[MessageCallback]
+var messageCallbacks {.threadvar.}: seq[MessageCallback]
 
 # Async procedure that processes messages and calls callbacks
 proc processMessages() {.async.} =
@@ -23,7 +23,7 @@ proc processMessages() {.async.} =
     if managedMsgs.len > 0 and messageCallbacks.len > 0:
       for msg in managedMsgs:
         for callback in messageCallbacks:
-          discard catch(callback(msg))
+          callback(msg)
 
 proc init*() =
   managedMsgs.add(

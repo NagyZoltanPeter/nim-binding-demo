@@ -9,7 +9,7 @@ import unittest
 
 import protobuf_serialization
 import stew/byteutils
-import demolib/message
+import message
 
 test "encode message":
   var msg =
