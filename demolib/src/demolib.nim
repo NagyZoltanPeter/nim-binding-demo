@@ -13,7 +13,7 @@ import message, api
 
 # Every Nim library must have this function called - the name is derived from
 # the `--nimMainPrefix` command line option
-proc libwakuNimMain() {.importc.}
+proc libdemoNimMain() {.importc.}
 
 # To control when the library has been initialized
 var libInitialized: AtomicFlag
@@ -25,44 +25,48 @@ type RequestItem = object
   argBuffer: pointer
   argLen: int
 
-var incomingQueue = initMupsic[1024, 16, RequestItem]()
-var outgoingQueue = initSipsic[1024, WakuMessage]()
+type ThreadContext = object
+  incomingQueue: Mupsic[1024, 16, RequestItem]
+  outgoingQueue: Sipsic[1024, WakuMessage]
+
+var threadContextP: ptr ThreadContext
 
 # Thread synchronization
-var dispatcherThread: Thread[void]
+var dispatcherThread: Thread[ptr ThreadContext]
 var threadRunning: Atomic[bool]
+
+proc createContext(): ptr ThreadContext =
+  result = ThreadContext.createShared()
+  # result.incomingQueue = initMupsic[1024, 16, RequestItem]
+  # result.outgoingQueue = initSipsic[1024, WakuMessage]
 
 proc initializeLibrary() = # {.exported.} =
   if not libInitialized.testAndSet():
     ## Every Nim library needs to call `<yourprefix>NimMain` once exactly, to initialize the Nim runtime.
     ## Being `<yourprefix>` the value given in the optional compilation flag --nimMainPrefix:yourprefix
-    libwakuNimMain()
+    libdemoNimMain()
+
     when declared(setupForeignThreadGc):
       setupForeignThreadGc()
 
 proc dispatchRequest(req: RequestItem) =
-  echo "dispatchRequest to ", req.req
+  debugEcho "dispatchRequest to ", req.req
   if req.req == "Send":
     let bytePtr = cast[ptr UncheckedArray[byte]](req.argBuffer)
     let arg = Protobuf.decode(toOpenArray(bytePtr, 0, req.argLen - 1), WakuMessage)
-    echo "dispatchingArg wakuMessage = ", $arg
+    debugEcho "dispatchingArg wakuMessage = ", $arg
     send(arg)
 
 # Thread procedure for dispatching calls
-proc dispatcherThreadProc() {.thread.} =
+proc dispatcherThreadProc(ctx: ptr ThreadContext) {.thread.} =
   info "Dispatcher thread started"
 
-  # Setup thread-local GC
-  when declared(setupForeignThreadGc):
-    setupForeignThreadGc()
-
-  # Create context for this thread
-  # let ctx = initSubmodule()
+  initializeLibrary()
 
   # Main dispatch loop
   while threadRunning.load:
     # Process incoming requests
-    let item = incomingQueue.pop()
+    let item = ctx[].incomingQueue.pop()
 
     if item.isSome():
       info "Processing request", req = item.get().req
@@ -88,12 +92,16 @@ proc createRunEnv() =
     # Initialize thread running flag
     threadRunning.store(true)
 
+    threadContextP = createContext()
     # Start the dispatcher thread
-    createThread(dispatcherThread, dispatcherThreadProc)
+    try:
+      createThread(dispatcherThread, dispatcherThreadProc, threadContextP)
+    except ValueError, ResourceExhaustedError:
+      freeShared(threadContextP)
 
     info "Dispatcher thread created"
 
-proc exec(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
+proc exec*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
   initializeLibrary()
   createRunEnv()
 
@@ -104,8 +112,12 @@ proc exec(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cde
   # Create request item
   let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen))
 
+  info "request item created and about to be pushed"
+
   # Add request to queue
-  if not incomingQueue.tryEnqueue(item):
+  if not threadContextP[].incomingQueue.push(item):
     error "Failed to enqueue request, queue might be full", req = reqStr
   else:
     info "Request enqueued successfully", req = reqStr
+
+  info "request pushed", $threadContextP[].incomingQueue.storage.len

@@ -3,6 +3,7 @@
 # but you can remove it if you wish.
 
 import stew/byteutils, chronos, times
+import chronicles
 import message
 
 var managedMsgs {.threadvar.}: seq[WakuMessage]
@@ -34,7 +35,9 @@ proc init*() =
   asyncSpawn processMessages()
 
 proc send*(msg: WakuMessage) =
+  # info "handling send request", $msg
   managedMsgs.add(msg)
+  debugEcho "message stored at ", managedMsgs.len
 
 proc subscribe*(callback: MessageCallback) =
   messageCallbacks.add(callback)

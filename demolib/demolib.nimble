@@ -79,14 +79,14 @@ proc buildLibrary(name: string, srcDir = "./", params = "", `type` = "static") =
   if `type` == "static":
     let cmd =
       "nim c" & " --out:build/" & name &
-      ".a --threads:on --app:staticlib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libwaku --skipParentCfg:on " &
+      ".a --threads:on --app:staticlib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libdemo --skipParentCfg:on " &
       extra_params & " " & sourceFile
     echo "Executing command: " & cmd
     exec cmd
   else:
     let cmd =
       "nim c" & " --out:build/" & name &
-      ".so --threads:on --app:lib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libwaku --skipParentCfg:on " &
+      ".so --threads:on --app:lib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libdemo --skipParentCfg:on " &
       extra_params & " " & sourceFile
     echo "Executing command: " & cmd
     exec cmd
@@ -123,7 +123,7 @@ task test, "Run all tests":
 
   if found:
     echo "Using test path: " & testPath
-    exec nimc & " " & lang & " --out:build/ " & " --threads:on " & " -r " & testPath
+    exec nimc & " " & lang & " --out:build/ " & " --mm:orc --threads:on --tlsEmulation:off --passL:./build/demolib.a " & " -r " & testPath
   else:
     echo "ERROR: Test file not found in any of the checked locations"
     echo "Listing current directory:"

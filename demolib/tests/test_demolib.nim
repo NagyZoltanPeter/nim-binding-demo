@@ -8,10 +8,18 @@
 import unittest
 import os
 import stew/byteutils
-import protobuf_serialization
+# import protobuf_serialization
+# import message
 
-import message
-import demolib
+import protobuf_serialization
+import protobuf_serialization/files/type_generator
+# This generates the same definition as above using a compile-time macro / parser
+import_proto3 "../../proto/message.proto"
+
+# Declare the C functions from the header
+proc exec(
+  req: cstring, argBuffer: pointer, argLen: cint
+) {.header: "../src/demolib.h", importc.}
 
 test "dispatch calls":
   var msg =

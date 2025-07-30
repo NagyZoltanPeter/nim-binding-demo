@@ -17,3 +17,7 @@ message WakuMessage {
 message callSend {
   WakuMessage msg = 1;
 }
+
+message onReceive {
+  WakuMessage msg = 1;
+}
