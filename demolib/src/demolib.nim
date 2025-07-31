@@ -120,4 +120,4 @@ proc exec*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cd
   else:
     info "Request enqueued successfully", req = reqStr
 
-  info "request pushed", $threadContextP[].incomingQueue.storage.len
+  info "request pushed", incomingQueueLen = $threadContextP[].incomingQueue.storage.len
