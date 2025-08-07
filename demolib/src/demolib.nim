@@ -7,12 +7,6 @@ import request_dispatcher
 import event_dispatcher
 import api
 
-when not declared(c_malloc):
-  proc c_malloc(size: csize_t): pointer {.
-    importc: "malloc", header: "<stdlib.h>".}
-  proc c_free(p: pointer) {.
-    importc: "free", header: "<stdlib.h>".}
-
 # thread and context management
 # instantiate mpsc_queue to feed toward nim context thread
 #  and spmc_queue for reading on binded side
@@ -38,11 +32,11 @@ proc initializeLibrary() = # {.exported.} =
       setupForeignThreadGc()
 
 #### Library interface
+proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
+  return allocShared(argLen)
 
-proc initDemoLib*() {.dynlib, exportc, cdecl.} =
-  initializeLibrary()
-  createRequestDispatcherEnv()
-  createEventDispatcherEnv()
+proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =  
+  deallocShared(argBuffer)
 
 proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
   # This initialization can be managed automatically with CPP global instance
@@ -62,14 +56,12 @@ proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, e
   # Add request to queue
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
+    deallocateArgBuffer(argBuffer)
   else:
     info "Request enqueued successfully", request = reqStr
 
   info "request pushed", incomingQueueLen = $requestContextP[].incomingQueue.storage.len
 
-proc stopDemoLib*() {.dynlib, exportc, cdecl.} =
-  shutdownRequestDispatcher()
-  shutdownEventDispatcher()
 
 # Public API functions following Google Protobuf pattern
 proc demolib_initialize*() {.dynlib, exportc, cdecl.} =

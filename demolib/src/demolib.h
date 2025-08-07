@@ -13,12 +13,11 @@ extern "C" {
 void demolib_initialize(void);
 void demolib_teardown(void);
 
-// Internal library functions (still available for backwards compatibility)
-void initDemoLib(void);
-void stopDemoLib(void);
-
 // Main API function
 void requestApiCall(const char* req, void* argBuffer, int argLen);
+
+void* allocateArgBuffer(int size);
+void  deallocateArgBuffer(void* argBuffer);
 
 #ifdef __cplusplus
 }

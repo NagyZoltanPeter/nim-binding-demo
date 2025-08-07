@@ -5,12 +5,6 @@ import lockfreequeues
 import protobuf_serialization
 import message, api
 
-when not declared(c_malloc):
-  proc c_malloc(size: csize_t): pointer {.
-    importc: "malloc", header: "<stdlib.h>".}
-  proc c_free(p: pointer) {.
-    importc: "free", header: "<stdlib.h>".}
-
 var requestDispatcherEnvInitialized: AtomicFlag
 
 # Queue for incoming requests (multi-producer, single-consumer)
@@ -43,7 +37,7 @@ proc dispatchRequest(req: RequestItem) =
     # it is important to release the buffer allocated in the host language side to avoid leaks.
     # To spare the most buffer copy host side should allocate buffer for protobuf and transfer ownership to nim lib.
     # hence nim lib must take care of free the buffer.
-    c_free(req.argBuffer)
+    deallocShared(req.argBuffer)
     
     info "dispatching to send with arg wakuMessage = ", wakuMessage = $arg
     send(arg)

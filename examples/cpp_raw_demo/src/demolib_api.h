@@ -15,17 +15,20 @@ void send(const WakuMessage &waku_msg)
 {
     // Create a callSend message that wraps the WakuMessage
     // Serialize the message to a string
-    auto serialized_msg = std::make_unique<std::string>("");
-    if (!waku_msg.SerializeToString(serialized_msg.get()))
+    auto sizeRequired = waku_msg.ByteSizeLong();
+    auto argBuffer = allocateArgBuffer(sizeRequired);
+
+    if (!waku_msg.SerializeToArray(argBuffer, sizeRequired))
     {
-        std::cerr << "Failed to serialize message" << std::endl;
+        std::cerr << "Failed to serialize message: " << waku_msg.DebugString() << std::endl;
+        deallocateArgBuffer(argBuffer);
         return;
     }
 
     // Call the Nim library's exec function with the serialized message
     // Cast data() from const unsigned char* to void*
-    requestApiCall("Send", reinterpret_cast<void*>(serialized_msg.get()->data()), serialized_msg.get()->size());
+    requestApiCall("Send", argBuffer, sizeRequired);
 
-    // must release the pointer due we transfer the ownership to the nim library
-    serialized_msg.release();
+    // buffer memory ownership is transfered to the nim library and will be deallocated after
+    // decoded prior to processing the request
 }

@@ -77,6 +77,7 @@ proc shutdownEventDispatcher*() =
 
 proc emitEvent*(event: string, argBuffer: seq[byte]) =
   let eventItem = EventItem(event: event, argBuffer: unsafeAddr argBuffer[0], argLen: argBuffer.len())
+  
   if not eventContextP[].outgoingQueue.push(eventItem):
     info "Failed to enqueue event, queue might be full", event = event
   else:

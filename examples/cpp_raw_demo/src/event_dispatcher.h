@@ -22,7 +22,7 @@ template <> struct EventName<onReceivedEvent> {
 class EventHandlerBase {
 public:
     virtual ~EventHandlerBase() = default;
-    virtual void call(const void* data, size_t size) const = 0;
+    virtual void call(void* data, size_t size) const = 0;
 };
 
 template <typename MessageT>
@@ -31,13 +31,16 @@ public:
     using Callback = std::function<void(const MessageT&)>;
     HandlerImpl(Callback cb) : callback(std::move(cb)) {}
 
-    void call(const void* data, size_t size) const override {
+    void call(void* data, size_t size) const override {
         MessageT msg;
-        if (!msg.ParsePartialFromArray(data, size)) {
-            std::cerr << "CPP side>Failed to parse protobuf message for event.\n";
-            return;
+        auto parseSucceeded = msg.ParseFromArray(data, size); 
+        deallocateArgBuffer(data);
+        if (parseSucceeded) {
+            callback(msg);
         }
-        callback(msg);
+        else {
+            std::cerr << "CPP side> Failed to parse protobuf message for event:" << msg.DebugString() << std::endl;
+        }
     }
 
 private:
@@ -56,7 +59,7 @@ template <typename MessageT>
         handlers[name] = std::make_unique<HandlerImpl<MessageT>>(std::move(handler));
     }
 
-    static void dispatch(const std::string& name, const void* data, size_t size) {
+    static void dispatch(const std::string& name, void* data, size_t size) {
         auto it = handlers.find(name);
         if (it != handlers.end()) {
             it->second->call(data, size);
