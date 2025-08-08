@@ -10,18 +10,30 @@ import message
 
 var managedMsgs {.threadvar.}: seq[WakuMessage]
 
+proc serializeToBuffer[T](obj: T): Result[tuple[buffer: pointer, size: int], void] =
+  let bufferSize = Protobuf.computeSize(obj)
+  var buffer = allocShared0(bufferSize)
+
+  if buffer == nil:
+    error "Cannot allocate memory for protobuf serialization."
+    return err()
+  var stream = unsafeMemoryOutput(buffer, bufferSize)
+  var writer = ProtobufWriter.init(stream)
+  let writeResult = catch: writeValue(writer, obj)
+  close(stream)
+
+  if writeResult.isErr():
+    error "Failed to serialize", error = writeResult.error().msg, obj = $obj
+    return err()  
+  return ok((buffer: buffer, size: bufferSize))
+
 proc emitOnReceivedEvent(msg: WakuMessage) =
   let event = onReceivedEvent(msg : msg)
-  let bufferSize = Protobuf.computeSize(event) 
-  var argBuffer = allocShared0(bufferSize)
+  let serialized = serializeToBuffer(event).valueOr:
+    error "Cannot emit OnReceivedEvent due to serialization error"
+    return
 
-  var stream = unsafeMemoryOutput(argBuffer, bufferSize)
-  # Create the protobuf writer
-  var writer = ProtobufWriter.init(stream)
-  # Write the event directly to the buffer
-  writeValue(writer, event)
-  # Close the stream to ensure all data is written
-  close(stream)  
+  let (argBuffer, bufferSize) = serialized
   emitEvent("onReceivedEvent", argBuffer, bufferSize)
 
 

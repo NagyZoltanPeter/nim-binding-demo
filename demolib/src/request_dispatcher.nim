@@ -32,15 +32,19 @@ proc dispatchRequest(req: RequestItem) =
 
     # decode transfer buffer to create API argument
     let bytePtr = cast[ptr UncheckedArray[byte]](req.argBuffer)
-    let arg = Protobuf.decode(toOpenArray(bytePtr, 0, req.argLen - 1), WakuMessage)
+    let arg = catch: Protobuf.decode(toOpenArray(bytePtr, 0, req.argLen - 1), WakuMessage)
 
     # it is important to release the buffer allocated in the host language side to avoid leaks.
     # To spare the most buffer copy host side should allocate buffer for protobuf and transfer ownership to nim lib.
     # hence nim lib must take care of free the buffer.
     deallocShared(req.argBuffer)
     
-    info "dispatching to send with arg wakuMessage = ", wakuMessage = $arg
-    send(arg)
+    if arg.isErr():
+      error "Failed to deserialize request", error = arg.error()
+      return
+
+    info "dispatching to send with arg wakuMessage = ", wakuMessage = $arg.get()
+    send(arg.get())
 
 proc processRequests(ctx: ptr RequestContext) {.async.} =
   # Main dispatch loop
