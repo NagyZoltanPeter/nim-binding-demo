@@ -75,11 +75,12 @@ proc shutdownEventDispatcher*() =
   isEventDispatcherRunning.store(false)
   joinThread(dispatcherThread)
 
-proc emitEvent*(event: string, argBuffer: seq[byte]) =
-  let eventItem = EventItem(event: event, argBuffer: unsafeAddr argBuffer[0], argLen: argBuffer.len())
+proc emitEvent*(event: string, argBuffer: pointer, argBufferSize: int) =
+  let eventItem = EventItem(event: event, argBuffer: argBuffer, argLen: argBufferSize)
   
   if not eventContextP[].outgoingQueue.push(eventItem):
     info "Failed to enqueue event, queue might be full", event = event
+    deallocShared(argBuffer)
   else:
     info "Event enqueued successfully", event = event
 

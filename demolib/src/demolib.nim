@@ -33,7 +33,7 @@ proc initializeLibrary() = # {.exported.} =
 
 #### Library interface
 proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
-  return allocShared(argLen)
+  return allocShared0(argLen)
 
 proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =  
   deallocShared(argBuffer)

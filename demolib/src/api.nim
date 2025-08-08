@@ -12,8 +12,21 @@ var managedMsgs {.threadvar.}: seq[WakuMessage]
 
 proc emitOnReceivedEvent(msg: WakuMessage) =
   let event = onReceivedEvent(msg : msg)
-  let encoded = Protobuf.encode(event)
-  emitEvent("onReceivedEvent", encoded)
+  let bufferSize = Protobuf.computeSize(event) 
+  var argBuffer = allocShared0(bufferSize)
+
+  var stream = unsafeMemoryOutput(argBuffer, bufferSize)
+  # Create the protobuf writer
+  var writer = ProtobufWriter.init(stream)
+  # Write the event directly to the buffer
+  writeValue(writer, event)
+  # Close the stream to ensure all data is written
+  close(stream)  
+  emitEvent("onReceivedEvent", argBuffer, bufferSize)
+
+
+  # let encoded = Protobuf.encode(event)
+  # emitEvent("onReceivedEvent", encoded)
   info "emitting onReceivedEvent", msg = $msg
 
 # Async procedure that processes messages and calls callbacks
