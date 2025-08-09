@@ -5,6 +5,10 @@
 #include "message.pb.h"
 
 
+void init(void) 
+{
+    requestApiCall("init", NULL, 0);
+}
 /**
  * Encodes a WakuMessage and sends it using the requestApiCall function.
  * This function is to be generated along with protobuf classes to represent API calls
@@ -27,7 +31,7 @@ void send(const WakuMessage &waku_msg)
 
     // Call the Nim library's exec function with the serialized message
     // Cast data() from const unsigned char* to void*
-    requestApiCall("Send", argBuffer, sizeRequired);
+    requestApiCall("send", argBuffer, sizeRequired);
 
     // buffer memory ownership is transfered to the nim library and will be deallocated after
     // decoded prior to processing the request

@@ -36,7 +36,7 @@ proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
   return allocShared0(argLen)
 
 proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =  
-  deallocShared(argBuffer)
+  if argBuffer != nil: deallocShared(argBuffer)
 
 proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
   # This initialization can be managed automatically with CPP global instance

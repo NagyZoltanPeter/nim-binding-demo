@@ -32,41 +32,50 @@ macro ffi*(procDef: untyped): untyped =
   let nameStr = $procDef.name
   let nameLit = newLit(nameStr)
   let params = procDef.params
-  # params[0] is return type, expect exactly one explicit param => total len == 2
-  if params.len != 2:
-    error "FFI proc '" & nameStr & "' must have exactly one parameter"
-  let identDefs = params[1]
-  if identDefs.kind != nnkIdentDefs or identDefs.len < 3:
-    error "Unexpected parameter AST form in proc " & nameStr
-  # identDefs layout: <ident> <type> <default or empty>
-  let paramTypeNode = identDefs[1]
-  let paramTypeNameLit = newLit($paramTypeNode)
   let procSym = procDef.name
-  # Registration statement appended after original proc
-  let registerStmt = quote do:
-    ffiTable[`nameLit`] = FfiEntry(
-      paramTypeName: `paramTypeNameLit`,
-      invoke: proc (buffer: pointer, len: int) {.gcsafe, raises: [].} =
-        let res = demarshal[`paramTypeNode`](buffer, len)
-        # Always free producer-owned shared memory after copying
-        if not buffer.isNil: 
-          deallocShared(buffer)
-        if res.isErr():
-          echo "FFI demarshal failed for ", `nameLit`, ": ", res.error()
-          return
-        try:
-          `procSym`(res.get())
-        except CatchableError as e:
-          echo "FFI target proc raised: ", e.msg
-        except Exception:
-          echo "FFI target proc raised (unknown): ", getCurrentExceptionMsg()
-    )
-  hint "Registered FFI proc: name = " & nameStr & " paramType = " & $paramTypeNode
+
+  var registerStmt: NimNode
+  if params.len == 1:
+    # Zero-argument proc
+    let paramTypeNameLit = newLit("")
+    registerStmt = quote do:
+      ffiTable[`nameLit`] = FfiEntry(
+        paramTypeName: `paramTypeNameLit`,
+        invoke: proc (buffer: pointer, len: int) {.gcsafe, raises: [].} =
+          if not buffer.isNil:
+            deallocShared(buffer)
+          try:
+            `procSym`()
+          except CatchableError as e:
+            echo "FFI target proc raised: ", e.msg
+          except Exception:
+            echo "FFI target proc raised (unknown): ", getCurrentExceptionMsg()
+      )
+  elif params.len == 2:
+    # Single-argument proc
+    let identDefs = params[1]
+    if identDefs.kind != nnkIdentDefs or identDefs.len < 3:
+      error "Unexpected parameter AST form in proc " & nameStr
+    let paramTypeNode = identDefs[1]
+    let paramTypeNameLit = newLit($paramTypeNode)
+    registerStmt = quote do:
+      ffiTable[`nameLit`] = FfiEntry(
+        paramTypeName: `paramTypeNameLit`,
+        invoke: proc (buffer: pointer, len: int) {.gcsafe, raises: [].} =
+          let res = demarshal[`paramTypeNode`](buffer, len)
+          if not buffer.isNil:
+            deallocShared(buffer)
+          if res.isErr():
+            echo "FFI demarshal failed for ", `nameLit`, ": ", res.error()
+            return
+          try:
+            `procSym`(res.get())
+          except CatchableError as e:
+            echo "FFI target proc raised: ", e.msg
+          except Exception:
+            echo "FFI target proc raised (unknown): ", getCurrentExceptionMsg()
+      )
+  else:
+    error "FFI proc '" & nameStr & "' must have zero or one parameter"
+
   result = newStmtList(procDef, registerStmt)
-
-# Example FFI procs (you can place these in other modules too; they auto-register)
-# proc Send*(msg: WakuMessage) {.ffi.} =
-#   info "Send called", msg = $msg
-
-# proc Subscribe*(sub: Subscription) {.ffi.} =
-#   info "Subscribe called", sub = $sub

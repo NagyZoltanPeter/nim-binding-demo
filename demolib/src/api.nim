@@ -54,7 +54,7 @@ proc processMessages() {.async.} =
 
     managedMsgs = @[]
 
-proc init*() =
+proc init*() {.ffi.} =
   managedMsgs.add(
     WakuMessage(payload: cast[seq[byte]]("Test message #1"), content_topic: "/zoltan/1/demo/0")
   )
@@ -64,8 +64,8 @@ proc init*() =
 
   info "API initialized, processing started"
 
-proc Send*(msg: WakuMessage) {.ffi.} =
+proc send*(msg: WakuMessage) {.ffi.} =
   let payload = string.fromBytes(msg.payload)
-  info "handling send request", msg = $msg, payload = payload
+  info "send API called", msg = $msg, payload = payload
   managedMsgs.add(msg)
   info "message stored at", index = (managedMsgs.len - 1)

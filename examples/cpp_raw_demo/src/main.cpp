@@ -20,6 +20,8 @@ int main(int argc, char *argv[])
         // Initialize demolib explicitly (following Google Protobuf pattern)
         demolib_initialize();
 
+        init();
+
         EventDispatcher::registerHandler<onReceivedEvent>([](const onReceivedEvent& msg) {
                 std::cout << "CPP side>Received message: " << msg.msg().content_topic() <<
                 " with payload: " << msg.msg().payload() << std::endl;

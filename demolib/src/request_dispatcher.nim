@@ -21,7 +21,6 @@ var isRequestDispatcherRunning: Atomic[bool]
 proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result = RequestContext.createShared()
   result.ffiLookupTable = ffiLookupTable
-  info "FFI registrations", ffi = repr(result.ffiLookupTable)
 
 # Dispatcher: look up and invoke
 proc dispatchFFIRequest*(ctx: ptr RequestContext, req: RequestItem) {.raises: [], gcsafe.} =
@@ -58,7 +57,6 @@ proc processRequests(ctx: ptr RequestContext) {.async.} =
 # Thread procedure for dispatching calls
 proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread, gcsafe.} =
   info "Dispatcher thread started"
-  init()
   waitFor processRequests(ctx)
 
   info "Dispatcher thread stopping"
