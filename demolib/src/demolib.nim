@@ -3,7 +3,7 @@ import chronicles
 import lockfreequeues
 import protobuf_serialization
 
-import request_dispatcher
+import request_dispatcher, request_item
 import event_dispatcher
 import api
 

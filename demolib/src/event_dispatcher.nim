@@ -4,12 +4,6 @@ import lockfreequeues
 import protobuf_serialization
 import message, api
 
-when not declared(c_malloc):
-  proc c_malloc(size: csize_t): pointer {.
-    importc: "malloc", header: "<stdlib.h>".}
-  proc c_free(p: pointer) {.
-    importc: "free", header: "<stdlib.h>".}
-
 var eventDispatcherEnvInitialized: AtomicFlag
 
 # Queue for incoming requests (multi-producer, single-consumer)

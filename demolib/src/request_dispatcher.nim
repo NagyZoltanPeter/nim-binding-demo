@@ -1,21 +1,16 @@
-import std/[options, atomics, locks, os]
+import std/[options, atomics, locks, os, tables]
 import chronicles
 import chronos
 import lockfreequeues
 import protobuf_serialization
-import message, api
+import message, api, request_item, ffi
 
 var requestDispatcherEnvInitialized: AtomicFlag
 
 # Queue for incoming requests (multi-producer, single-consumer)
-type RequestItem* = object
-  req*: string
-  argBuffer*: pointer
-  argLen*: int
-
 type RequestContext* = object
   incomingQueue*: Mupsic[1024, 16, RequestItem]
-  # outgoingQueue: Sipsic[1024, WakuMessage]
+  ffiLookupTable*: FFILookupTable
 
 var requestContextP*: ptr RequestContext
 
@@ -23,28 +18,29 @@ var requestContextP*: ptr RequestContext
 var dispatcherThread: Thread[ptr RequestContext]
 var isRequestDispatcherRunning: Atomic[bool]
 
-proc createRequestContext*(): ptr RequestContext =
+proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result = RequestContext.createShared()
+  result.ffiLookupTable = ffiLookupTable
+  info "FFI registrations", ffi = repr(result.ffiLookupTable)
 
-proc dispatchRequest(req: RequestItem) =
-  info "dispatchRequest to ", requestProcessor = req.req
-  if req.req == "Send":
-
-    # decode transfer buffer to create API argument
-    let bytePtr = cast[ptr UncheckedArray[byte]](req.argBuffer)
-    let arg = catch: Protobuf.decode(toOpenArray(bytePtr, 0, req.argLen - 1), WakuMessage)
-
-    # it is important to release the buffer allocated in the host language side to avoid leaks.
-    # To spare the most buffer copy host side should allocate buffer for protobuf and transfer ownership to nim lib.
-    # hence nim lib must take care of free the buffer.
-    deallocShared(req.argBuffer)
-    
-    if arg.isErr():
-      error "Failed to deserialize request", error = arg.error()
-      return
-
-    info "dispatching to send with arg wakuMessage = ", wakuMessage = $arg.get()
-    send(arg.get())
+# Dispatcher: look up and invoke
+proc dispatchFFIRequest*(ctx: ptr RequestContext, req: RequestItem) {.raises: [], gcsafe.} =
+  info "dispatchFFIRequest", target = req.req, bytes = req.argLen
+  if not ctx[].ffiLookupTable.hasKey(req.req):
+    error "Unknown FFI proc", name = req.req
+    if not req.argBuffer.isNil: deallocShared(req.argBuffer)
+    return
+  let entry = ctx[].ffiLookupTable.getOrDefault(req.req)
+  if entry.invoke.isNil:
+    error "FFI entry has no invoke", name = req.req
+    if not req.argBuffer.isNil: deallocShared(req.argBuffer)
+    return
+  try:
+    entry.invoke(req.argBuffer, req.argLen)
+  except CatchableError as e:
+    error "FFI invoke raised", name = req.req, err = e.msg
+  except Exception as e:
+    error "FFI invoke raised (unknown)", name = req.req, err = e.msg
 
 proc processRequests(ctx: ptr RequestContext) {.async.} =
   # Main dispatch loop
@@ -54,22 +50,14 @@ proc processRequests(ctx: ptr RequestContext) {.async.} =
 
     if item.isSome():
       info "Processing request", req = item.get().req
-      dispatchRequest(item.get())
-      # Here we would process the request and potentially put responses
-      # in the outgoing queue
-      # This is a placeholder for actual processing logic
-
-      # Example of how we might handle a message
-      # let wakuMsg = WakuMessage(payload: @[])
-      # discard outgoingQueue.tryEnqueue(wakuMsg)
+      dispatchFFIRequest(ctx, item.get())
 
     # Avoid busy waiting
     await sleepAsync(10)
 
 # Thread procedure for dispatching calls
-proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread.} =
+proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread, gcsafe.} =
   info "Dispatcher thread started"
-  # Diagnostic: Try to force output to stdout
   init()
   waitFor processRequests(ctx)
 
@@ -83,7 +71,7 @@ proc createRequestDispatcherEnv*() =
     # Initialize thread running flag
     isRequestDispatcherRunning.store(true)
 
-    requestContextP = createRequestContext()
+    requestContextP = createRequestContext(ffiTable)
     # Start the dispatcher thread
     try:
       info "About to create dispatcher thread"

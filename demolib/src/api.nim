@@ -7,6 +7,7 @@ import chronicles
 import protobuf_serialization
 import event_dispatcher
 import message
+import ffi
 
 var managedMsgs {.threadvar.}: seq[WakuMessage]
 
@@ -63,8 +64,8 @@ proc init*() =
 
   info "API initialized, processing started"
 
-proc send*(msg: WakuMessage) =
+proc Send*(msg: WakuMessage) {.ffi.} =
   let payload = string.fromBytes(msg.payload)
   info "handling send request", msg = $msg, payload = payload
   managedMsgs.add(msg)
-  info "message stored at", count = managedMsgs.len
+  info "message stored at", index = (managedMsgs.len - 1)
