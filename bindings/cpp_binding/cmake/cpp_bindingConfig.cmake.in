@@ -1,0 +1,12 @@
+# Config file for the cpp_binding package
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+find_dependency(Protobuf REQUIRED)
+
+include("${CMAKE_CURRENT_LIST_DIR}/cpp_bindingTargets.cmake")
+
+# Provide variables for convenience
+set(cpp_binding_INCLUDE_DIRS "${PACKAGE_PREFIX_DIR}/include")
+set(cpp_binding_LIBRARIES cpp_binding)

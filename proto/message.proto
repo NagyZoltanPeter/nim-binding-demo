@@ -13,6 +13,10 @@ message WakuMessage {
   optional bytes rate_limit_proof = 21;
 }
 
+message callSend  {
+  WakuMessage msg = 1;
+}
+
 message onReceivedEvent {
   WakuMessage msg = 1;
 }

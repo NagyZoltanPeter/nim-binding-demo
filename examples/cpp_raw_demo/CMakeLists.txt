@@ -6,40 +6,25 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Find Protobuf package
 find_package(Protobuf REQUIRED)
-find_package(absl REQUIRED)
 
 # Include directories
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/build  # For generated header
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/build
     ${Protobuf_INCLUDE_DIRS}
-    ${CMAKE_CURRENT_BINARY_DIR}  # Add build directory for generated protobuf files
 )
-
-# Generate protobuf C++ files
-set(PROTO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../proto/message.proto)
-protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
 
 # Add executable
-add_executable(cpp_demo
-    src/main.cpp
-    ${PROTO_SRCS}
-    ${PROTO_HDRS}
-)
+add_executable(cpp_demo src/main.cpp)
 
 # Check if we're building as part of the main project
-if(TARGET demolib_static)
+if(TARGET cpp_binding)
     # Use the imported target from the main build
     target_link_libraries(cpp_demo
-        demolib_static
-        ${Protobuf_LIBRARIES}
-        absl::log_internal_message
-        absl::log_internal_check_op
+        cpp_binding
     )
-    add_dependencies(cpp_demo demolib_static)
+    add_dependencies(cpp_demo cpp_binding)
 else()
     # Standalone build - use the static library path
     set(DEMOLIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/build/demolib.a)
@@ -57,12 +42,7 @@ else()
         endif()
     endif()
     
-    target_link_libraries(cpp_demo
-        ${DEMOLIB_PATH}
-        ${Protobuf_LIBRARIES}
-        absl::log_internal_message
-        absl::log_internal_check_op
-    )
+    target_link_libraries(cpp_demo ${DEMOLIB_PATH} ${Protobuf_LIBRARIES})
 endif()
 
 # Set install prefix to project root if not specified

@@ -4,8 +4,7 @@
 #include <chrono>
 #include <thread>
 
-#include "demolib_api.h"
-#include "event_dispatcher.h"
+#include "demolib/demolib.hpp"
 
 using namespace std::chrono_literals;
 
@@ -14,12 +13,11 @@ int main(int argc, char *argv[])
 {
     // Initialize Google's protobuf library
     GOOGLE_PROTOBUF_VERIFY_VERSION;
+    demolib_initialize();
 
     try
     {
-        // Initialize demolib explicitly (following Google Protobuf pattern)
-        demolib_initialize();
-
+    // Initialize demolib explicitly and request init via API
         init();
 
         EventDispatcher::registerHandler<onReceivedEvent>([](const onReceivedEvent& msg) {
@@ -56,6 +54,7 @@ int main(int argc, char *argv[])
         std::this_thread::sleep_for(400ms);
         std::cout << "CPP side>Slept 400!" << std::endl;
 
+        waku_msg.set_payload("Now the second message from CPP");
         send(waku_msg);
         std::cout << "CPP side>2nd Message sent successfully!" << std::endl;
 
