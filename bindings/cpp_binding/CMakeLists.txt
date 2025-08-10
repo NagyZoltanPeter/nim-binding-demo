@@ -45,7 +45,6 @@ endif()
 
 target_link_libraries(cpp_binding
     PUBLIC
-        demolib_static
         ${Protobuf_LIBRARIES}
         absl::log_internal_message
         absl::log_internal_check_op
