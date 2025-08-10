@@ -2,6 +2,7 @@
 **/build/*
 **/bin/*
 **/lib/*
+include/*
 **/CMakeFiles/*
 # Ignore all files in proto directory except .proto files
 proto/[!.]**

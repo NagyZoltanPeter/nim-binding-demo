@@ -90,7 +90,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 
 ### Component Targets
 
-- `demolib_nim`: Nim library build target (libnimdemo)
+- `libnimdemo`: Nim library build target (libnimdemo)
 - `protoc-gen-dispatcher`: Protoc plugin executable
 - `cpp_demo_app`: C++ demo executable
 

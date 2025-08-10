@@ -59,7 +59,7 @@ else()
 endif()
 
 # Create a custom target for the Nim library
-add_custom_target(demolib_nim_build ALL
+add_custom_target(libnimdemo_build ALL
     DEPENDS ${DEMOLIB_STATIC_LIB}
 )
 
@@ -69,14 +69,14 @@ set_target_properties(demolib_static PROPERTIES
     IMPORTED_LOCATION ${DEMOLIB_STATIC_LIB}
     INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-add_dependencies(demolib_static demolib_nim_build)
+add_dependencies(demolib_static libnimdemo_build)
 
 # Test target using nimble
 if(NIMBLE_TOOL)
     add_custom_target(test_demolib
         COMMAND ${NIMBLE_TOOL} test
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        DEPENDS demolib_nim_build
+        DEPENDS libnimdemo_build
         COMMENT "Running Nim demolib tests"
     )
 endif()

@@ -43,7 +43,7 @@ endif()
 
 # Custom target for building libnimdemo using nimble
 if(BUILD_DEMOLIB OR BUILD_ALL)
-    add_custom_target(demolib_nim
+    add_custom_target(libnimdemo
         COMMENT "Building Nim libnimdemo library"
         WORKING_DIRECTORY ${DEMOLIB_DIR}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${DEMOLIB_BUILD_DIR}
@@ -56,7 +56,7 @@ if(BUILD_DEMOLIB OR BUILD_ALL)
     set_target_properties(demolib_static PROPERTIES
         IMPORTED_LOCATION ${DEMOLIB_STATIC_LIB}
     )
-    add_dependencies(demolib_static demolib_nim)
+    add_dependencies(demolib_static libnimdemo)
 endif()
 
 # Add subdirectories for different components
@@ -81,7 +81,7 @@ add_custom_target(build_protoc_plugin
 
 add_custom_target(build_nim_lib
     COMMENT "Building only the Nim library"
-    DEPENDS demolib_nim
+    DEPENDS libnimdemo
 )
 
 add_custom_target(build_cpp_demo_only
@@ -92,7 +92,7 @@ add_custom_target(build_cpp_demo_only
 # Main build target that builds everything
 add_custom_target(build_all
     COMMENT "Building all components"
-    DEPENDS demolib_nim protoc-gen-dispatcher cpp_binding cpp_demo_app
+    DEPENDS libnimdemo protoc-gen-dispatcher cpp_binding cpp_demo_app
 )
 
 # Clean target for Nim build artifacts
