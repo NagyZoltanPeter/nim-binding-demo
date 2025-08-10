@@ -16,22 +16,22 @@ This project uses a unified CMake build system that combines all components into
 ```
 nim-binding-demo/
 ├── CMakeLists.txt              # Root CMake configuration
-├── demolib/
+├── libnimdemo/
 │   ├── CMakeLists.txt          # Nim library build configuration
-│   └── demolib.nimble          # Nim package configuration
+│   └── libnimdemo.nimble       # Nim package configuration
 ├── cpp_generator/
 │   └── CMakeLists.txt          # Protoc plugin build configuration
 ├── examples/cpp_raw_demo/
 │   └── CMakeLists.txt          # C++ demo build configuration
 └── proto/
-    └── message.proto           # Protocol buffer definitions
+   └── message.proto           # Protocol buffer definitions
 ```
 
 ## Build Options
 
 The build system provides several configuration options:
 
-- `BUILD_DEMOLIB`: Build the Nim demolib library (default: ON)
+- `BUILD_DEMOLIB`: Build the Nim libnimdemo library (default: ON)
 - `BUILD_CPP_GENERATOR`: Build the protoc C++ generator plugin (default: ON)
 - `BUILD_CPP_DEMO`: Build the C++ demo application (default: ON)
 - `BUILD_ALL`: Build all components (default: OFF)
@@ -83,14 +83,14 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 
 ### Primary Targets
 
-- `build_all`: Builds all components (demolib, protoc plugin, C++ demo)
-- `build_nim_lib`: Builds only the Nim demolib library
+- `build_all`: Builds all components (libnimdemo, protoc plugin, C++ demo)
+- `build_nim_lib`: Builds only the Nim libnimdemo library
 - `build_protoc_plugin`: Builds only the protoc generator plugin
 - `build_cpp_demo_only`: Builds only the C++ demo application
 
 ### Component Targets
 
-- `demolib_nim`: Nim library build target
+- `demolib_nim`: Nim library build target (libnimdemo)
 - `protoc-gen-dispatcher`: Protoc plugin executable
 - `cpp_demo`: C++ demo executable
 
@@ -105,13 +105,13 @@ After a successful build, you'll find:
 
 ```
 build/
-├── demolib/build/
-│   ├── demolib.a               # Static Nim library
-│   └── demolib.h               # Generated C header
+├── libnimdemo/build/
+│   ├── libnimdemo.a            # Static Nim library
+│   └── libnimdemo.h            # C header
 ├── examples/cpp_raw_demo/
 │   └── cpp_demo                # C++ demo executable
 └── proto/
-    └── protoc-gen-dispatcher   # Protoc plugin executable
+   └── protoc-gen-dispatcher   # Protoc plugin executable
 ```
 
 Additionally, a convenience symlink is created in the root directory:
@@ -142,7 +142,7 @@ Each component can also be built independently:
 ### Nim Library Only
 
 ```bash
-cd demolib
+cd libnimdemo
 nimble buildlib
 ```
 

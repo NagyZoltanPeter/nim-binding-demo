@@ -16,18 +16,17 @@ import api
 
 # Every Nim library must have this function called - the name is derived from
 # the `--nimMainPrefix` command line option
-proc libdemoNimMain() {.importc.}
+proc libnimdemoNimMain() {.importc.}
 
 # To control when the library has been initialized
 var libInitialized: AtomicFlag
 var runEnvInitialized: AtomicFlag
 
-proc initializeLibrary() = # {.exported.} =
+proc initializeLibrary() =
   if not libInitialized.testAndSet():
     ## Every Nim library needs to call `<yourprefix>NimMain` once exactly, to initialize the Nim runtime.
     ## Being `<yourprefix>` the value given in the optional compilation flag --nimMainPrefix:yourprefix
-    libdemoNimMain()
-
+    libnimdemoNimMain()
     when declared(setupForeignThreadGc):
       setupForeignThreadGc()
 
@@ -64,15 +63,15 @@ proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, e
 
 
 # Public API functions following Google Protobuf pattern
-proc demolib_initialize*() {.dynlib, exportc, cdecl.} =
-  ## Initialize the demolib library. Must be called before using any other demolib functions.
+proc libnimdemo_initialize*() {.dynlib, exportc, cdecl.} =
+  ## Initialize the libnimdemo library. Must be called before using any other libnimdemo functions.
   ## This is equivalent to initDemoLib() but follows the explicit initialization pattern.
   initializeLibrary()
   createRequestDispatcherEnv()
   createEventDispatcherEnv()
 
-proc demolib_teardown*() {.dynlib, exportc, cdecl.} =
-  ## Cleanup the demolib library. Should be called when done using the library.
+proc libnimdemo_teardown*() {.dynlib, exportc, cdecl.} =
+  ## Cleanup the libnimdemo library. Should be called when done using the library.
   ## This is equivalent to stopDemoLib() but follows the explicit teardown pattern.
   shutdownRequestDispatcher()
   shutdownEventDispatcher()

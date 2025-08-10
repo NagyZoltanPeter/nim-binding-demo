@@ -3,7 +3,7 @@ Demonstrate protobuf contract based nim library and language bindings
 
 ## Project Structure
 
-- `demolib/` - Nim library with C API
+- `libnimdemo/` - Nim library with C API
 - `examples/` - Example applications in different languages
 - `proto/` - Protocol buffer definitions
 
@@ -17,18 +17,18 @@ Demonstrate protobuf contract based nim library and language bindings
 ## Building the Nim Library
 
 ```bash
-cd demolib
+cd libnimdemo
 nimble buildlib
 ```
 
-This will create both static and dynamic libraries in the `demolib/build` directory.
+This will create the static library and header in `libnimdemo/build`.
 
 ## Building and Running Examples
 
 ### C++ Demo
 
 ```bash
-cd examples/cpp_demo
+cd examples/cpp_raw_demo
 mkdir -p build
 cd build
 cmake ..

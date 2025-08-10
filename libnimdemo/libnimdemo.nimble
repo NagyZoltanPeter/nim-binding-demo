@@ -91,19 +91,20 @@ proc buildBinary(name: string, srcDir = "./", params = "", lang = "c") =
 #     echo "Executing command: " & cmd
 #     exec cmd
 
-proc buildLibrary(name: string, srcDir = "./", params = "", `type` = "static") =
+proc buildLibrary(srcName: string, outName: string, srcDir = "./", params = "", `type` = "static") =
   if not dirExists "build":
     mkDir "build"
 
   # Debug output
-  echo "Building library: " & name
+  echo "Building library from source: " & srcName
+  echo "Output library name: " & outName
   echo "Source directory: " & srcDir
 
   # Use the params directly without C++ object linking
   let extra_params = params
 
   # Construct the source file path correctly
-  let sourceFile = srcDir & name & ".nim"
+  let sourceFile = srcDir & srcName & ".nim"
   echo "Source file: " & sourceFile
 
   # Check if the source file exists
@@ -113,22 +114,23 @@ proc buildLibrary(name: string, srcDir = "./", params = "", `type` = "static") =
 
   if `type` == "static":
     let cmd =
-      "nim c" & " --out:build/" & name &
-      ".a --threads:on --app:staticlib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libdemo --skipParentCfg:on " &
+      "nim c" & " --out:build/" & outName &
+      ".a --threads:on --app:staticlib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libnimdemo --skipParentCfg:on " &
       extra_params & " " & sourceFile
     echo "Executing command: " & cmd
     exec cmd
   else:
     let cmd =
-      "nim c" & " --out:build/" & name &
-      ".so --threads:on --app:lib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libdemo --skipParentCfg:on " &
+      "nim c" & " --out:build/" & outName &
+      ".so --threads:on --app:lib --opt:size --noMain --mm:orc --header --undef:metrics --nimMainPrefix:libnimdemo --skipParentCfg:on " &
       extra_params & " " & sourceFile
     echo "Executing command: " & cmd
     exec cmd
     
 task buildlib, "Builds static and dynamic library artifacts":
-  let name = "demolib"
-  buildLibrary(name, "src/", " -d:chronicles_log_level='TRACE' ", "static")
+  let srcName = "libnimdemo"
+  let outName = "libnimdemo"
+  buildLibrary(srcName, outName, "src/", " -d:chronicles_log_level='TRACE' ", "static")
   # buildLibrary(name, "src/", " -d:chronicles_log_level='TRACE' ", "dynamic")
 
 task test, "Run all tests":
@@ -139,7 +141,7 @@ task test, "Run all tests":
   var testLocations = [
     getCurrentDir() & "/tests/" & testFile, # Current dir/tests
     getCurrentDir() & "/../tests/" & testFile, # Parent dir/tests
-    getCurrentDir() & "/demolib/tests/" & testFile, # Current dir/demolib/tests
+  getCurrentDir() & "/libnimdemo/tests/" & testFile, # Current dir/libnimdemo/tests
     "./tests/" & testFile, # Relative to script
     "../tests/" & testFile, # Parent relative to script
   ]
@@ -158,7 +160,7 @@ task test, "Run all tests":
 
   if found:
     echo "Using test path: " & testPath
-    exec nimc & " " & lang & " --out:build/ " & " --mm:orc --threads:on --tlsEmulation:off --passL:./build/demolib.a " & " -r " & testPath
+    exec nimc & " " & lang & " --out:build/ " & " --mm:orc --threads:on --tlsEmulation:off --passL:./build/libnimdemo.a " & " -r " & testPath
   else:
     echo "ERROR: Test file not found in any of the checked locations"
     echo "Listing current directory:"

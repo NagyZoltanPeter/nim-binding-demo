@@ -2,23 +2,23 @@
 
 // Single-include public facade for the C++ binding consumers.
 // Provides:
-//  - C API interop from demolib.h
+//  - C API interop from libnimdemo.h
 //  - EventDispatcher utilities
 //  - EventName specializations for known events
 //  - Convenience API wrappers (init, send)
 
-#include "demolib.h"            // C API from Nim
+#include "libnimdemo.h"         // C API from Nim
 #include "message.pb.h"         // Protobuf messages
 #include "demolib/event_dispatcher.hpp"
 #include "demolib/event_tag.hpp"
 
 void cpp_binding_initialize(void) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    demolib_initialize();
+    libnimdemo_initialize();
 }
 
 void cpp_binding_teardown(void) {
-    demolib_teardown();
+    libnimdemo_teardown();
     // Clean up protobuf
     google::protobuf::ShutdownProtobufLibrary();
 }

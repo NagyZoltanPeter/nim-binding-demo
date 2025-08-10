@@ -6,7 +6,7 @@
 #include <memory>
 #include <iostream>
 
-#include "demolib.h"
+#include "libnimdemo.h"
 #include "message.pb.h"
 #include "demolib/event_tag.hpp"
 

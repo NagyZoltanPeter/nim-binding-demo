@@ -4,7 +4,7 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/../../demolib/src",
+                "${workspaceFolder}/../../libnimdemo/src",
                 "${workspaceFolder}/../../proto",
                 "/opt/homebrew/include",
                 "/usr/local/include"

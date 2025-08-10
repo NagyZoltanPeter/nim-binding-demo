@@ -32,8 +32,8 @@ target_include_directories(cpp_binding
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
-        $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/demolib/src>
-        $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/demolib/build>
+    $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/libnimdemo/src>
+    $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/libnimdemo/build>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
@@ -52,12 +52,12 @@ target_link_libraries(cpp_binding
 )
 add_dependencies(cpp_binding demolib_static)
 
-# Optional: on macOS, produce a single static library by merging demolib.a into cpp_binding
+# Optional: on macOS, produce a single static library by merging libnimdemo.a into cpp_binding
 if(APPLE)
     add_custom_command(TARGET cpp_binding POST_BUILD
-        COMMAND /usr/bin/libtool -static -o $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding> ${PROJECT_ROOT_DIR}/demolib/build/demolib.a
+    COMMAND /usr/bin/libtool -static -o $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding> ${PROJECT_ROOT_DIR}/libnimdemo/build/libnimdemo.a
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding>
-        COMMENT "Merging demolib.a into libcpp_binding.a (macOS)"
+    COMMENT "Merging libnimdemo.a into libcpp_binding.a (macOS)"
         VERBATIM)
 endif()
 add_dependencies(cpp_binding demolib_static)

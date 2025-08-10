@@ -10,8 +10,8 @@ find_package(Protobuf REQUIRED)
 
 # Include directories
 include_directories(
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/build
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo/build
     ${Protobuf_INCLUDE_DIRS}
 )
 
@@ -27,18 +27,18 @@ if(TARGET cpp_binding)
     add_dependencies(cpp_demo cpp_binding)
 else()
     # Standalone build - use the static library path
-    set(DEMOLIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib/build/demolib.a)
+    set(DEMOLIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo/build/libnimdemo.a)
     
     # Check if demolib exists, if not try to build it
     if(NOT EXISTS ${DEMOLIB_PATH})
-        message(STATUS "Demolib not found, attempting to build it...")
+        message(STATUS "libnimdemo not found, attempting to build it...")
         execute_process(
             COMMAND nimble buildlib
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../demolib
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo
             RESULT_VARIABLE NIMBLE_RESULT
         )
         if(NOT NIMBLE_RESULT EQUAL 0)
-            message(FATAL_ERROR "Failed to build demolib. Please run 'nimble buildlib' in the demolib directory first.")
+            message(FATAL_ERROR "Failed to build libnimdemo. Please run 'nimble buildlib' in the libnimdemo directory first.")
         endif()
     endif()
     

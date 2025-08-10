@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build cpp_demo",
+            "label": "build cpp_raw_demo",
             "type": "shell",
-            "command": "mkdir -p examples/cpp_demo/build && cd examples/cpp_demo/build && cmake .. && make",
+            "command": "mkdir -p examples/cpp_raw_demo/build && cd examples/cpp_raw_demo/build && cmake .. && make",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -20,9 +20,9 @@
             }
         },
         {
-            "label": "clean cpp_demo build",
+            "label": "clean cpp_raw_demo build",
             "type": "shell",
-            "command": "rm -rf examples/cpp_demo/build",
+            "command": "rm -rf examples/cpp_raw_demo/build",
             "group": "build",
             "presentation": {
                 "echo": true,
@@ -35,9 +35,9 @@
             }
         },
         {
-            "label": "build demolib",
+            "label": "build libnimdemo",
             "type": "shell",
-            "command": "cd demolib && nimble buildlib",
+            "command": "cd libnimdemo && nimble buildlib",
             "group": "build",
             "presentation": {
                 "echo": true,
