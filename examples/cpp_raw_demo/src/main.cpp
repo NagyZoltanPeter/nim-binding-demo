@@ -12,8 +12,8 @@ using namespace std::chrono_literals;
 int main(int argc, char *argv[])
 {
     // Initialize Google's protobuf library
-    GOOGLE_PROTOBUF_VERIFY_VERSION;
-    demolib_initialize();
+    // GOOGLE_PROTOBUF_VERIFY_VERSION;
+    cpp_binding_initialize();
 
     try
     {
@@ -68,10 +68,8 @@ int main(int argc, char *argv[])
     }
 
     // Cleanup demolib (always called, even on exceptions)
-    demolib_teardown();
+    cpp_binding_teardown();
     
-    // Clean up protobuf
-    google::protobuf::ShutdownProtobufLibrary();
 
     return 0;
 }

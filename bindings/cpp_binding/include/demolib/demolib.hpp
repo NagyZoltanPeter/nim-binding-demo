@@ -12,6 +12,17 @@
 #include "demolib/event_dispatcher.hpp"
 #include "demolib/event_tag.hpp"
 
+void cpp_binding_initialize(void) {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+    demolib_initialize();
+}
+
+void cpp_binding_teardown(void) {
+    demolib_teardown();
+    // Clean up protobuf
+    google::protobuf::ShutdownProtobufLibrary();
+}
+
 // Known events mapping (extend as new events are added)
 // Proto defines: message onReceivedEvent { WakuMessage msg = 1; }
 struct onReceivedEvent; // forward from proto message

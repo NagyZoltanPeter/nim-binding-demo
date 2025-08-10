@@ -13,6 +13,9 @@ message WakuMessage {
   optional bytes rate_limit_proof = 21;
 }
 
+message callInit {  
+}
+
 message callSend  {
   WakuMessage msg = 1;
 }
