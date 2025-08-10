@@ -18,13 +18,17 @@ proc demarshal*[T](buffer: pointer, len: int): Result[T, string] {.raises: [].} 
     return err("nil buffer")
   if len <= 0:
     return err("non-positive length")
-  let bytePtr = cast[ptr UncheckedArray[byte]](buffer)
+  var stream = unsafeMemoryInput(toOpenArray(cast[ptr UncheckedArray[byte]](buffer), 0, len - 1))
   try:
-    ok(Protobuf.decode(toOpenArray(bytePtr, 0, len - 1), T))
+    var reader = ProtobufReader.init(stream)
+    let value = readValue(reader, T)
+    ok(value)
   except CatchableError as e:
     err(e.msg)
   except Exception:
     err(getCurrentExceptionMsg())
+  # Note: memory input stream does not require explicit close and declaring
+  # raises:[] forbids listing close which may raise IOError; let GC clean it up.
 
 macro ffi*(procDef: untyped): untyped =
   if procDef.kind != nnkProcDef:
