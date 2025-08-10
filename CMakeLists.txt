@@ -70,7 +70,7 @@ if(BUILD_CPP_BINDING OR BUILD_ALL)
 endif()
 
 if(BUILD_CPP_DEMO OR BUILD_ALL)
-    add_subdirectory(examples/cpp_raw_demo)
+    add_subdirectory(examples/cpp_demo_app)
 endif()
 
 # Custom targets for partial builds
@@ -86,13 +86,13 @@ add_custom_target(build_nim_lib
 
 add_custom_target(build_cpp_demo_only
     COMMENT "Building only the C++ demo"
-    DEPENDS cpp_demo
+    DEPENDS cpp_demo_app
 )
 
 # Main build target that builds everything
 add_custom_target(build_all
     COMMENT "Building all components"
-    DEPENDS demolib_nim protoc-gen-dispatcher cpp_binding cpp_demo
+    DEPENDS demolib_nim protoc-gen-dispatcher cpp_binding cpp_demo_app
 )
 
 # Clean target for Nim build artifacts

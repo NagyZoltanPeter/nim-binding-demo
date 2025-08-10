@@ -6,7 +6,7 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/libnimdemo/src",
                 "${workspaceFolder}/proto",
-                "${workspaceFolder}/examples/cpp_demo/src",
+                "${workspaceFolder}/examples/cpp_demo_app/src",
                 "/opt/homebrew/include",
                 "/usr/local/include"
             ],

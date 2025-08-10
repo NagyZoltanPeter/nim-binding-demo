@@ -21,7 +21,7 @@ nim-binding-demo/
 │   └── libnimdemo.nimble       # Nim package configuration
 ├── cpp_generator/
 │   └── CMakeLists.txt          # Protoc plugin build configuration
-├── examples/cpp_raw_demo/
+├── examples/cpp_demo_app/
 │   └── CMakeLists.txt          # C++ demo build configuration
 └── proto/
    └── message.proto           # Protocol buffer definitions
@@ -92,7 +92,7 @@ cmake -DCMAKE_BUILD_TYPE=Release ..
 
 - `demolib_nim`: Nim library build target (libnimdemo)
 - `protoc-gen-dispatcher`: Protoc plugin executable
-- `cpp_demo`: C++ demo executable
+- `cpp_demo_app`: C++ demo executable
 
 ### Utility Targets
 
@@ -108,8 +108,8 @@ build/
 ├── libnimdemo/build/
 │   ├── libnimdemo.a            # Static Nim library
 │   └── libnimdemo.h            # C header
-├── examples/cpp_raw_demo/
-│   └── cpp_demo                # C++ demo executable
+├── examples/cpp_demo_app/
+│   └── cpp_demo_app           # C++ demo executable
 └── proto/
    └── protoc-gen-dispatcher   # Protoc plugin executable
 ```
@@ -117,13 +117,13 @@ build/
 Additionally, a convenience symlink is created in the root directory:
 
 ```
-cpp_demo -> build/examples/cpp_raw_demo/cpp_demo  # Symlink to demo executable
+cpp_demo_app -> build/examples/cpp_demo_app/cpp_demo_app  # Symlink to demo executable
 ```
 
 This allows you to run the demo directly from the root folder:
 
 ```bash
-./cpp_demo
+./cpp_demo_app
 ```
 
 ## Nim Library Integration
@@ -158,7 +158,7 @@ make
 ### C++ Demo Only
 
 ```bash
-cd examples/cpp_raw_demo
+cd examples/cpp_demo_app
 mkdir build && cd build
 cmake ..
 make

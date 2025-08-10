@@ -28,12 +28,12 @@ This will create the static library and header in `libnimdemo/build`.
 ### C++ Demo
 
 ```bash
-cd examples/cpp_raw_demo
+cd examples/cpp_demo_app
 mkdir -p build
 cd build
 cmake ..
 make
-./cpp_demo
+./cpp_demo_app
 ```
 
 ## VSCode Configuration

@@ -2,17 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug cpp_demo",
+            "name": "Debug cpp_demo_app",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/examples/cpp_demo/build/cpp_demo",
+            "program": "${workspaceFolder}/examples/cpp_demo_app/build/cpp_demo_app",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/examples/cpp_demo/build",
+            "cwd": "${workspaceFolder}/examples/cpp_demo_app/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
-            "preLaunchTask": "build cpp_demo",
+            "preLaunchTask": "build cpp_demo_app",
             "setupCommands": [
                 {
                     "description": "Enable pretty printing",
@@ -22,17 +22,17 @@
             ]
         },
         {
-            "name": "Run cpp_demo",
+            "name": "Run cpp_demo_app",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/examples/cpp_demo/build/cpp_demo",
+            "program": "${workspaceFolder}/examples/cpp_demo_app/build/cpp_demo_app",
             "args": [],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/examples/cpp_demo/build",
+            "cwd": "${workspaceFolder}/examples/cpp_demo_app/build",
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
-            "preLaunchTask": "build cpp_demo"
+            "preLaunchTask": "build cpp_demo_app"
         }
     ]
 }

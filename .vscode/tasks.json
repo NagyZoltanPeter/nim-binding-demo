@@ -2,9 +2,9 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build cpp_raw_demo",
+            "label": "build cpp_demo_app",
             "type": "shell",
-            "command": "mkdir -p examples/cpp_raw_demo/build && cd examples/cpp_raw_demo/build && cmake .. && make",
+            "command": "mkdir -p examples/cpp_demo_app/build && cd examples/cpp_demo_app/build && cmake .. && make",
             "group": {
                 "kind": "build",
                 "isDefault": true
@@ -20,9 +20,9 @@
             }
         },
         {
-            "label": "clean cpp_raw_demo build",
+            "label": "clean cpp_demo_app build",
             "type": "shell",
-            "command": "rm -rf examples/cpp_raw_demo/build",
+            "command": "rm -rf examples/cpp_demo_app/build",
             "group": "build",
             "presentation": {
                 "echo": true,
