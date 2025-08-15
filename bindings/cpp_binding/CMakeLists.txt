@@ -75,9 +75,14 @@ elseif(MSVC)
         VERBATIM)
 else()
     # Generic Unix/MinGW: use ar in MRI script mode to add libraries
-    # This avoids shell globs and is widely supported by GNU/LLVM ar
     add_custom_command(TARGET cpp_binding POST_BUILD
-        COMMAND /bin/sh -c "cat > '$<TARGET_FILE_DIR:cpp_binding>/merge.mri' << 'EOF'\ncreate $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a\naddlib $<TARGET_FILE:cpp_binding>\naddlib ${DEMOLIB_PATH}\nsave\nend\nEOF\n\n\"${CMAKE_AR}\" -M < '$<TARGET_FILE_DIR:cpp_binding>/merge.mri' && ${CMAKE_COMMAND} -E copy '$<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a' '$<TARGET_FILE:cpp_binding>'"
+        COMMAND ${CMAKE_COMMAND} -E echo "create $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a" > $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND ${CMAKE_COMMAND} -E echo "addlib $<TARGET_FILE:cpp_binding>" >> $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND ${CMAKE_COMMAND} -E echo "addlib ${DEMOLIB_PATH}" >> $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND ${CMAKE_COMMAND} -E echo "save" >> $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND ${CMAKE_COMMAND} -E echo "end" >> $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND "${CMAKE_AR}" -M < $<TARGET_FILE_DIR:cpp_binding>/merge.mri
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding>
         COMMENT "Merging libnimdemo.a into libcpp_binding.a (ar MRI)"
         VERBATIM)
 endif()
