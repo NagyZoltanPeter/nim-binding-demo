@@ -4,7 +4,7 @@
 #include <chrono>
 #include <thread>
 
-#include "demolib/demolib.hpp"
+#include "demolib/api.hpp"
 
 using namespace std::chrono_literals;
 

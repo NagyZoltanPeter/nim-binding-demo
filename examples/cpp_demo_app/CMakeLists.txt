@@ -12,6 +12,8 @@ find_package(Protobuf REQUIRED)
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo/src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libnimdemo/build
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../bindings/cpp_binding/include
+    ${CMAKE_CURRENT_BINARY_DIR}
     ${Protobuf_INCLUDE_DIRS}
 )
 
@@ -43,6 +45,11 @@ else()
         endif()
     endif()
     
+    # Generate protobuf sources locally so that demolib/api.hpp can include message.pb.h
+    set(PROTO_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../../proto/message.proto)
+    protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
+    target_sources(cpp_demo_app PRIVATE ${PROTO_SRCS})
+
     target_link_libraries(cpp_demo_app ${DEMOLIB_PATH} ${Protobuf_LIBRARIES})
 endif()
 
