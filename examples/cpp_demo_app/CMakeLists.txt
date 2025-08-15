@@ -23,10 +23,7 @@ if(TARGET cpp_binding)
     # Use the imported target from the main build
     # Handle circular dependency between demolib_static and cpp_binding using linker groups
     target_link_libraries(cpp_demo_app
-        -Wl,--start-group
-        demolib_static
         cpp_binding
-        -Wl,--end-group
     )
     add_dependencies(cpp_demo_app cpp_binding demolib_static)
 else()

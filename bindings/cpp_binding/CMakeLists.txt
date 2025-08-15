@@ -51,15 +51,36 @@ target_link_libraries(cpp_binding
 )
 add_dependencies(cpp_binding demolib_static)
 
-# Optional: on macOS, produce a single static library by merging libnimdemo.a into cpp_binding
+# Merge libnimdemo.a into cpp_binding to produce a single archive on all platforms
+get_target_property(DEMOLIB_PATH demolib_static IMPORTED_LOCATION)
+if(NOT DEMOLIB_PATH)
+    message(FATAL_ERROR "Could not determine path of demolib_static (IMPORTED_LOCATION)")
+endif()
+
 if(APPLE)
+    # macOS uses Apple's libtool to merge static libraries
     add_custom_command(TARGET cpp_binding POST_BUILD
-    COMMAND /usr/bin/libtool -static -o $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding> ${PROJECT_ROOT_DIR}/libnimdemo/build/libnimdemo.a
+        COMMAND /usr/bin/libtool -static -o $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a
+                $<TARGET_FILE:cpp_binding> ${DEMOLIB_PATH}
         COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a $<TARGET_FILE:cpp_binding>
-    COMMENT "Merging libnimdemo.a into libcpp_binding.a (macOS)"
+        COMMENT "Merging libnimdemo.a into libcpp_binding.a (Apple libtool)"
+        VERBATIM)
+elseif(MSVC)
+    # MSVC toolchain: use lib.exe to combine libraries
+    add_custom_command(TARGET cpp_binding POST_BUILD
+        COMMAND lib /nologo /OUT:$<TARGET_FILE_DIR:cpp_binding>\\cpp_binding_merged.lib
+                $<TARGET_FILE:cpp_binding> ${DEMOLIB_PATH}
+        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE_DIR:cpp_binding>/cpp_binding_merged.lib $<TARGET_FILE:cpp_binding>
+        COMMENT "Merging libnimdemo.lib into cpp_binding.lib (MSVC lib.exe)"
+        VERBATIM)
+else()
+    # Generic Unix/MinGW: use ar in MRI script mode to add libraries
+    # This avoids shell globs and is widely supported by GNU/LLVM ar
+    add_custom_command(TARGET cpp_binding POST_BUILD
+        COMMAND /bin/sh -c "cat > '$<TARGET_FILE_DIR:cpp_binding>/merge.mri' << 'EOF'\ncreate $<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a\naddlib $<TARGET_FILE:cpp_binding>\naddlib ${DEMOLIB_PATH}\nsave\nend\nEOF\n\n\"${CMAKE_AR}\" -M < '$<TARGET_FILE_DIR:cpp_binding>/merge.mri' && ${CMAKE_COMMAND} -E copy '$<TARGET_FILE_DIR:cpp_binding>/libcpp_binding_merged.a' '$<TARGET_FILE:cpp_binding>'"
+        COMMENT "Merging libnimdemo.a into libcpp_binding.a (ar MRI)"
         VERBATIM)
 endif()
-add_dependencies(cpp_binding demolib_static)
 
 # Optional install (can be customized later)
 include(GNUInstallDirs)
