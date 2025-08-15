@@ -1,0 +1,8 @@
+[package]
+name = "rust_demo_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Use the binding crate by relative path
+rust_binding = { path = "../../bindings/rust_binding" }

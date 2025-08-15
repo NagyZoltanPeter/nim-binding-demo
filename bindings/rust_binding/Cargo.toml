@@ -1,0 +1,17 @@
+[package]
+name = "rust_binding"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+once_cell = "1.19"
+parking_lot = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"

@@ -57,7 +57,7 @@ install(TARGETS cpp_demo_app
 )
 
 # Add a run target to execute the built binary
-add_custom_target(run
+add_custom_target(run_cpp
     COMMAND ${CMAKE_CURRENT_BINARY_DIR}/cpp_demo_app
     DEPENDS cpp_demo_app
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}

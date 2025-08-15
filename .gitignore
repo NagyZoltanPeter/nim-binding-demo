@@ -13,3 +13,15 @@ nimble.paths
 nimbledeps
 Makefile
 cmake_install.cmake
+
+# Rust / Cargo artifacts
+bindings/rust_binding/target/
+**/target/
+**/.cargo/
+**/Cargo.lock
+**/*.rsp
+**/*.pdb
+**/*.dSYM/
+**/*.rlib
+**/*.rmeta
+**/*.d

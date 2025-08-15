@@ -11,6 +11,7 @@ option(BUILD_DEMOLIB "Build the Nim libnimdemo library" ON)
 option(BUILD_CPP_GENERATOR "Build the protoc C++ generator plugin" ON)
 option(BUILD_CPP_DEMO "Build the C++ demo application" ON)
 option(BUILD_CPP_BINDING "Build the C++ binding library" ON)
+option(BUILD_RUST_DEMO "Build the Rust demo application" ON)
 option(BUILD_ALL "Build all components" OFF)
 
 # Set default build type if not specified
@@ -69,8 +70,22 @@ if(BUILD_CPP_BINDING OR BUILD_ALL)
     add_subdirectory(bindings/cpp_binding)
 endif()
 
+# Optional Rust binding (requires Cargo); enabled under BUILD_CPP_BINDING or BUILD_ALL
+if(BUILD_CPP_BINDING OR BUILD_ALL)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/bindings/rust_binding/Cargo.toml")
+        add_subdirectory(bindings/rust_binding)
+    endif()
+endif()
+
 if(BUILD_CPP_DEMO OR BUILD_ALL)
     add_subdirectory(examples/cpp_demo_app)
+endif()
+
+# Add Rust demo app (Cargo-driven)
+if(BUILD_RUST_DEMO OR BUILD_ALL)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/examples/rust_demo_app/Cargo.toml")
+        add_subdirectory(examples/rust_demo_app)
+    endif()
 endif()
 
 # Custom targets for partial builds
@@ -92,7 +107,7 @@ add_custom_target(build_cpp_demo_only
 # Main build target that builds everything
 add_custom_target(build_all
     COMMENT "Building all components"
-    DEPENDS libnimdemo protoc-gen-dispatcher cpp_binding cpp_demo_app
+    DEPENDS libnimdemo protoc-gen-dispatcher cpp_binding cpp_demo_app rust_binding rust_demo_app
 )
 
 # Clean target for Nim build artifacts
@@ -119,6 +134,19 @@ message(STATUS "Build libnimdemo: ${BUILD_DEMOLIB}")
 message(STATUS "Build C++ generator: ${BUILD_CPP_GENERATOR}")
 message(STATUS "Build C++ binding: ${BUILD_CPP_BINDING}")
 message(STATUS "Build C++ demo: ${BUILD_CPP_DEMO}")
+message(STATUS "Build Rust demo: ${BUILD_RUST_DEMO}")
 message(STATUS "Nim compiler: ${NIM_COMPILER}")
 message(STATUS "Nimble tool: ${NIMBLE_TOOL}")
 message(STATUS "============================================")
+
+# Convenience target to build and run the Rust demo
+if(TARGET rust_demo_app)
+    add_custom_target(run_rust
+        COMMENT "Build and run Rust demo app"
+        DEPENDS libnimdemo rust_binding rust_demo_app
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/examples/rust_demo_app
+        COMMAND ${CMAKE_COMMAND} -E env RUST_LOG=info
+                ${CMAKE_COMMAND} -E echo "Running rust_demo_app..."
+        COMMAND cargo run
+    )
+endif()
