@@ -28,29 +28,24 @@ proc serializeToBuffer[T](obj: T): Result[tuple[buffer: pointer, size: int], voi
     return err()  
   return ok((buffer: buffer, size: bufferSize))
 
-proc emitOnReceivedEvent(msg: WakuMessage) =
+proc emitOnReceivedEvent(msg: WakuMessage) {.async.} =
   let event = onReceivedEvent(msg : msg)
   let serialized = serializeToBuffer(event).valueOr:
     error "Cannot emit OnReceivedEvent due to serialization error"
     return
 
-  let (argBuffer, bufferSize) = serialized
-  emitEvent("onReceivedEvent", argBuffer, bufferSize)
-
-
-  # let encoded = Protobuf.encode(event)
-  # emitEvent("onReceivedEvent", encoded)
   info "emitting onReceivedEvent", msg = $msg
+  let (argBuffer, bufferSize) = serialized
+  await emitEvent("onReceivedEvent", argBuffer, bufferSize)
 
 # Async procedure that processes messages and calls callbacks
 proc processMessages() {.async.} =
   while true:
-    # Wait for 2 seconds
-    await sleepAsync(20)
+    await sleepAsync(chronos.milliseconds(200))
     # If we have messages and callbacks
     if managedMsgs.len > 0:
       for msg in managedMsgs:
-        emitOnReceivedEvent(msg)
+        await emitOnReceivedEvent(msg)
 
     managedMsgs = @[]
 

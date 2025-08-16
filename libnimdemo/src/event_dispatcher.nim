@@ -1,5 +1,6 @@
 import std/[options, atomics, locks, os]
 import chronicles
+import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 import message, api
@@ -14,6 +15,8 @@ type EventItem* = object
 
 type EventContext* = object
   outgoingQueue: Sipsic[1024, EventItem]
+  eventSignal: ThreadSignalPtr 
+
 
 var eventContextP*: ptr EventContext
 
@@ -23,6 +26,15 @@ var isEventDispatcherRunning: Atomic[bool]
 
 proc createEventContext*(): ptr EventContext =
   result = EventContext.createShared()
+  result.eventSignal = ThreadSignalPtr.new().valueOr:
+    error "Cannot create event signaling"
+    quit(QuitFailure)
+
+proc destroyEventContext(ctx: ptr EventContext) =
+  if ctx != nil:
+    discard ctx[].eventSignal.close()
+    freeShared(ctx)
+
 
 proc dispatchEvent(event: cstring, argBuffer: pointer, argLen: cint) {.importc: "dispatchEvent".}
 
@@ -34,15 +46,14 @@ proc dispatcherThreadProc(ctx: ptr EventContext) {.thread.} =
 
   # Main dispatch loop
   while isEventDispatcherRunning.load:
-    # Process incoming requests
-    let item = ctx[].outgoingQueue.pop()
+    var item = ctx[].outgoingQueue.pop()
 
-    if item.isSome():
+    while item.isSome():
       info "Processing event", req = item.get().event
       dispatchEvent(item.get().event, item.get().argBuffer, cast[cint](item.get().argLen))
+      item = ctx[].outgoingQueue.pop()
 
-    # Avoid busy waiting
-    sleep(10)
+    waitFor ctx[].eventSignal.wait()
 
   info "Event Dispatcher thread stopping"
 
@@ -62,14 +73,16 @@ proc createEventDispatcherEnv*() =
       info "Event dispatcher thread created successfully"
     except ValueError, ResourceExhaustedError:
       error "Failed to create event dispatcher thread"
-      freeShared(eventContextP)
+      destroyEventContext(eventContextP)
 
 proc shutdownEventDispatcher*() =
   info "Stopping event dispatcher thread"
   isEventDispatcherRunning.store(false)
+  discard eventContextP[].eventSignal.fireSync()
   joinThread(dispatcherThread)
+  destroyEventContext(eventContextP)
 
-proc emitEvent*(event: string, argBuffer: pointer, argBufferSize: int) =
+proc emitEvent*(event: string, argBuffer: pointer, argBufferSize: int) {.async.} =
   let eventItem = EventItem(event: event, argBuffer: argBuffer, argLen: argBufferSize)
   
   if not eventContextP[].outgoingQueue.push(eventItem):
@@ -77,4 +90,4 @@ proc emitEvent*(event: string, argBuffer: pointer, argBufferSize: int) =
     deallocShared(argBuffer)
   else:
     info "Event enqueued successfully", event = event
-
+    await eventContextP[].eventSignal.fire()

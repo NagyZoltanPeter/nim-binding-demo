@@ -1,6 +1,6 @@
 import std/[options, atomics, locks, os, tables]
 import chronicles
-import chronos
+import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 import message, api, request_item, ffi
@@ -11,6 +11,7 @@ var requestDispatcherEnvInitialized: AtomicFlag
 type RequestContext* = object
   incomingQueue*: Mupsic[1024, 16, RequestItem]
   ffiLookupTable*: FFILookupTable
+  requestSignal*: ThreadSignalPtr 
 
 var requestContextP*: ptr RequestContext
 
@@ -21,6 +22,14 @@ var isRequestDispatcherRunning: Atomic[bool]
 proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result = RequestContext.createShared()
   result.ffiLookupTable = ffiLookupTable
+  result.requestSignal = ThreadSignalPtr.new().valueOr:
+    error "Cannot create request signaling"
+    quit(QuitFailure)
+
+proc destroyRequestContext(ctx: ptr RequestContext) =
+  if ctx != nil:
+    discard ctx[].requestSignal.close()
+    freeShared(ctx)
 
 # Dispatcher: look up and invoke
 proc dispatchFFIRequest*(ctx: ptr RequestContext, req: RequestItem) {.raises: [], gcsafe.} =
@@ -44,15 +53,14 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: RequestItem) {.raises: []
 proc processRequests(ctx: ptr RequestContext) {.async.} =
   # Main dispatch loop
   while isRequestDispatcherRunning.load:
-    # Process incoming requests
-    let item = ctx[].incomingQueue.pop()
-
-    if item.isSome():
+    var item = ctx[].incomingQueue.pop()
+    # process all request in the queue, do not wait for signal
+    while item.isSome():
       info "Processing request", req = item.get().req
       dispatchFFIRequest(ctx, item.get())
+      item = ctx[].incomingQueue.pop()
 
-    # Avoid busy waiting
-    await sleepAsync(10)
+    await ctx[].requestSignal.wait()
 
 # Thread procedure for dispatching calls
 proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread, gcsafe.} =
@@ -77,9 +85,11 @@ proc createRequestDispatcherEnv*() =
       info "Dispatcher thread created successfully"
     except ValueError, ResourceExhaustedError:
       error "Failed to create dispatcher thread"
-      freeShared(requestContextP)
+      destroyRequestContext(requestContextP)
 
 proc shutdownRequestDispatcher*() =
   info "Stopping request dispatcher thread"
   isRequestDispatcherRunning.store(false)
+  discard requestContextP[].requestSignal.fireSync()
   joinThread(dispatcherThread)
+  destroyRequestContext(requestContextP)

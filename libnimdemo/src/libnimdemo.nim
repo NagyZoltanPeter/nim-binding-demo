@@ -1,5 +1,6 @@
 import std/[options, atomics, locks, os]
 import chronicles
+import chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 
@@ -57,9 +58,9 @@ proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, e
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
   else:
-    info "Request enqueued successfully", request = reqStr
+    info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
+    discard requestContextP[].requestSignal.fireSync()
 
-  info "request pushed", incomingQueueLen = $requestContextP[].incomingQueue.storage.len
 
 
 # Public API functions following Google Protobuf pattern
