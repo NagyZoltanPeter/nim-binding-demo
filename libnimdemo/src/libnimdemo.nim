@@ -39,21 +39,15 @@ proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =
   if argBuffer != nil: deallocShared(argBuffer)
 
 proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
-  # This initialization can be managed automatically with CPP global instance
-  # initializeLibrary()
-  # createRunEnv()
-
-  # Convert cstring to string for easier handling
   let reqStr = $req
   info "Adding lib call", req = reqStr, argLen = argLen
 
   # Create request item
-  let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen))
+  let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: nil)
 
   info "request item created and about to be pushed"
 
   let producer =   requestContextP[].incomingQueue.getProducer()
-  # Add request to queue
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
@@ -61,6 +55,24 @@ proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, e
     info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
     discard requestContextP[].requestSignal.fireSync()
 
+var threadResponseChannel {.threadvar.} = ChannelSPSCSingle[ResponseBuffer]
+
+proc requestApiCallSync*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
+  let reqStr = $req
+  info "Adding lib call", req = reqStr, argLen = argLen
+
+  # Create request item
+  let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: addr threadResponseChannel)
+
+  info "request item created and about to be pushed"
+
+  let producer =   requestContextP[].incomingQueue.getProducer()
+  if not producer.push(item):
+    info "Failed to enqueue request, queue might be full", request = reqStr
+    deallocateArgBuffer(argBuffer)
+  else:
+    info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
+    discard requestContextP[].requestSignal.fireSync()
 
 
 # Public API functions following Google Protobuf pattern
