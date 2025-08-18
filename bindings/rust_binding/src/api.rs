@@ -5,7 +5,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
 extern "C" {
-    fn requestApiCall(req: *const c_char, arg_buffer: *mut c_void, arg_len: c_int);
+    fn asyncApiCall(req: *const c_char, arg_buffer: *mut c_void, arg_len: c_int);
     fn allocateArgBuffer(size: c_int) -> *mut c_void;
 }
 
@@ -14,7 +14,7 @@ pub fn init() {
     // Match C++ binding semantics: no payload for init
     unsafe {
         let cname = CString::new("init").unwrap();
-        requestApiCall(cname.as_ptr(), std::ptr::null_mut(), 0);
+        asyncApiCall(cname.as_ptr(), std::ptr::null_mut(), 0);
     }
 }
 
@@ -34,6 +34,6 @@ pub fn send(msg: &proto::WakuMessage) {
         }
         ptr::copy_nonoverlapping(buf.as_ptr(), arg as *mut u8, buf.len());
         let cname = CString::new("send").unwrap();
-        requestApiCall(cname.as_ptr(), arg, buf.len() as c_int);
+        asyncApiCall(cname.as_ptr(), arg, buf.len() as c_int);
     }
 }

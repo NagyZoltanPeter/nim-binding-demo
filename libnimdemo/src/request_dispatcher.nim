@@ -3,13 +3,13 @@ import chronicles
 import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
-import message, api, request_item, ffi
+import message, api, thread_data_exchange, ffi
 
 var requestDispatcherEnvInitialized: AtomicFlag
 
 # Queue for incoming requests (multi-producer, single-consumer)
 type RequestContext* = object
-  incomingQueue*: Mupsic[1024, 16, RequestItem]
+  incomingQueue*: Mupsic[1024, 16, ApiCallRequest]
   ffiLookupTable*: FFILookupTable
   requestSignal*: ThreadSignalPtr 
 
@@ -32,7 +32,7 @@ proc destroyRequestContext(ctx: ptr RequestContext) =
     freeShared(ctx)
 
 # Dispatcher: look up and invoke
-proc dispatchFFIRequest*(ctx: ptr RequestContext, req: RequestItem) {.raises: [], gcsafe.} =
+proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises: [], gcsafe.} =
   info "dispatchFFIRequest", target = req.req, bytes = req.argLen
   if not ctx[].ffiLookupTable.hasKey(req.req):
     error "Unknown FFI proc", name = req.req

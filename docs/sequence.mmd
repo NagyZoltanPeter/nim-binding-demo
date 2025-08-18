@@ -19,7 +19,7 @@ sequenceDiagram
     %% App init call
     CPP->>CppBind: init()
     activate CppBind
-    CppBind->>NimReq: requestApiCall("init", nullptr, 0)
+    CppBind->>NimReq: asyncApiCall("init", nullptr, 0)
     Note right of NimReq: Enqueue init request
     CppBind-->>CPP: return
     deactivate CppBind
@@ -36,7 +36,7 @@ sequenceDiagram
     CPP->>CppBind: send(WakuMessage)
     activate CppBind
     CppBind->>CppBind: SerializeToArray + allocateArgBuffer
-    CppBind->>NimReq: requestApiCall("send", arg, len)
+    CppBind->>NimReq: asyncApiCall("send", arg, len)
     CppBind-->>CPP: return
     deactivate CppBind
     NimReq->>Qreq: push(Request:send, buf)

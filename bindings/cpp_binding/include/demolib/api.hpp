@@ -33,7 +33,7 @@ template <> struct EventName<onReceivedEvent> {
 
 // Convenience C++ wrappers for C API
 inline void init() {
-    requestApiCall("init", nullptr, 0);
+    asyncApiCall("init", nullptr, 0);
 }
 
 inline void send(const WakuMessage& waku_msg) {
@@ -44,6 +44,6 @@ inline void send(const WakuMessage& waku_msg) {
         deallocateArgBuffer(argBuffer);
         return;
     }
-    requestApiCall("send", argBuffer, sizeRequired);
+    asyncApiCall("send", argBuffer, sizeRequired);
     // Ownership of argBuffer is transferred to the Nim library.
 }

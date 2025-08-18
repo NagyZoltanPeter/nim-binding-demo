@@ -4,7 +4,7 @@ import chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 
-import request_dispatcher, request_item
+import request_dispatcher, thread_data_exchange
 import event_dispatcher
 import api
 
@@ -38,42 +38,56 @@ proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
 proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =  
   if argBuffer != nil: deallocShared(argBuffer)
 
-proc requestApiCall*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
+proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
-  info "Adding lib call", req = reqStr, argLen = argLen
+  info "Async API call", req = reqStr, argLen = argLen
 
   # Create request item
-  let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: nil)
-
-  info "request item created and about to be pushed"
+  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: nil)
 
   let producer =   requestContextP[].incomingQueue.getProducer()
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_QUEUE_FULL
   else:
     info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
     discard requestContextP[].requestSignal.fireSync()
+
+  return NIMAPI_OK
 
 var threadResponseChannel {.threadvar.} = ChannelSPSCSingle[ResponseBuffer]
 
-proc requestApiCallSync*(req: cstring, argBuffer: pointer, argLen: cint) {.dynlib, exportc, cdecl.} =
+proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint, 
+                  respBuffer: var pointer, respLen: var cint): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
-  info "Adding lib call", req = reqStr, argLen = argLen
+  info "Sync API call", req = reqStr, argLen = argLen
+
+  # reset response ahead
+  respBuffer = nil
+  respLen = 0
 
   # Create request item
-  let item = RequestItem(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: addr threadResponseChannel)
-
-  info "request item created and about to be pushed"
+  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: addr threadResponseChannel)
 
   let producer =   requestContextP[].incomingQueue.getProducer()
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_QUEUE_FULL
   else:
     info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
     discard requestContextP[].requestSignal.fireSync()
-
+  
+  var callResult : ApiCallResult
+  let recvOk = ctx.reqChannel.tryRecv(callResult)
+  if not recvOk:
+    error "waku thread could not receive a request"
+    return NIMAPI_ERR_NO_ANSWER
+  
+  respBuffer = callResult.buffer
+  respLen = callResult.len
+  return callResult.return_code
 
 # Public API functions following Google Protobuf pattern
 proc libnimdemo_initialize*() {.dynlib, exportc, cdecl.} =

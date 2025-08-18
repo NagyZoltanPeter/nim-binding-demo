@@ -15,8 +15,8 @@ pub mod api;
 
 // C API from libnimdemo.h
 extern "C" {
-    // void requestApiCall(const char* req, void* argBuffer, int argLen);
-    fn requestApiCall(req: *const c_char, arg_buffer: *mut c_void, arg_len: c_int);
+    // void asyncApiCall(const char* req, void* argBuffer, int argLen);
+    fn asyncApiCall(req: *const c_char, arg_buffer: *mut c_void, arg_len: c_int);
     // void* allocateArgBuffer(int size);
     fn allocateArgBuffer(size: c_int) -> *mut c_void;
     // void deallocateArgBuffer(void* p);

@@ -1,7 +1,7 @@
 import std/[macros, tables, typetraits]
 import results
 import protobuf_serialization
-import message, request_item
+import message, thread_data_exchange
 
 type
   FfiEntry* = object
