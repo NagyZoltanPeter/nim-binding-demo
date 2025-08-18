@@ -21,7 +21,8 @@ requires "nim >= 2.2.4",
   "chronos",
   "metrics",
   "results",
-  "lockfreequeues"
+  "lockfreequeues",
+  "taskpools"
 
 let nimc = getEnv("NIMC", "nim") # Which nim compiler to use
 let lang = getEnv("NIMLANG", "c") # Which backend (c/cpp/js)

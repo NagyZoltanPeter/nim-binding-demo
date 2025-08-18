@@ -3,6 +3,7 @@ import chronicles
 import chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
+import taskpools/channels_spsc_single
 
 import request_dispatcher, thread_data_exchange
 import event_dispatcher
@@ -56,7 +57,7 @@ proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynli
 
   return NIMAPI_OK
 
-var threadResponseChannel {.threadvar.} = ChannelSPSCSingle[ResponseBuffer]
+var threadResponseChannel {.threadvar.} : ChannelSPSCSingle[ApiResponse]
 
 proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint, 
                   respBuffer: var pointer, respLen: var cint): cint {.dynlib, exportc, cdecl.} =
@@ -78,16 +79,16 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
   else:
     info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
     discard requestContextP[].requestSignal.fireSync()
-  
-  var callResult : ApiCallResult
-  let recvOk = ctx.reqChannel.tryRecv(callResult)
+
+  var callResult : ApiResponse
+  let recvOk = threadResponseChannel.tryRecv(callResult)
   if not recvOk:
     error "waku thread could not receive a request"
     return NIMAPI_ERR_NO_ANSWER
   
   respBuffer = callResult.buffer
-  respLen = callResult.len
-  return callResult.return_code
+  respLen = cint(callResult.len)
+  return cint(callResult.return_code)
 
 # Public API functions following Google Protobuf pattern
 proc libnimdemo_initialize*() {.dynlib, exportc, cdecl.} =
