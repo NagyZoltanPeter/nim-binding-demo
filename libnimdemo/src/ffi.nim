@@ -1,34 +1,20 @@
 import std/[macros, tables, typetraits]
 import results
 import protobuf_serialization
-import message, thread_data_exchange
+import thread_data_exchange, serde
+
+type InvokeType* = enum
+  AsyncCall
+  SyncCall
 
 type
   FfiEntry* = object
     paramTypeName*: string
-    invoke*: proc (buffer: pointer, len: int) {.gcsafe.}
+    invoke*: proc (buffer: pointer, len: int, result: var ApiResponse, call: InvokeType) {.gcsafe.}
 
 type
   FFILookupTable* = TableRef[string, FfiEntry]
 var ffiTable*: FFILookupTable  = newTable[string, FfiEntry]()
-
-# Generic safe demarshal from a raw buffer allocated with allocShared0 / allocShared
-proc demarshal*[T](buffer: pointer, len: int): Result[T, string] {.raises: [].} =
-  if buffer.isNil:
-    return err("nil buffer")
-  if len <= 0:
-    return err("non-positive length")
-  var stream = unsafeMemoryInput(toOpenArray(cast[ptr UncheckedArray[byte]](buffer), 0, len - 1))
-  try:
-    var reader = ProtobufReader.init(stream)
-    let value = readValue(reader, T)
-    ok(value)
-  except CatchableError as e:
-    err(e.msg)
-  except Exception:
-    err(getCurrentExceptionMsg())
-  # Note: memory input stream does not require explicit close and declaring
-  # raises:[] forbids listing close which may raise IOError; let GC clean it up.
 
 macro ffi*(procDef: untyped): untyped =
   if procDef.kind != nnkProcDef:
@@ -37,6 +23,44 @@ macro ffi*(procDef: untyped): untyped =
   let nameLit = newLit(nameStr)
   let params = procDef.params
   let procSym = procDef.name
+  let returnType = procDef.params[0]
+
+  let okReturnType =
+    if (returnType.kind == nnkBracketExpr and eqIdent(returnType[0], "Result") and returnType.len == 3 and eqIdent(returnType[2], "string")):
+      returnType[1]
+    else:
+      error(
+        "Expected return type of 'Result[T, string]' got '" & repr(returnType) & "'", procDef)
+
+  let isVoidResult = eqIdent(okReturnType, "void")
+  echo "isVoidResult is ", repr(isVoidResult)
+  var returnTypeHandlingStmt: NimNode
+  let rSym = genSym(nskLet, "r")
+  let responseSym = genSym(nskParam, "response")
+  echo "rSym is ", repr(rSym)
+  if isVoidResult:
+    returnTypeHandlingStmt = quote do:
+      if `rSym`.isErr():
+        echo "FFI target proc returned error: ", `rSym`.error()
+        `responseSym`.returnCode = NIMAPI_FAIL
+        `responseSym`.errorDesc = `rSym`.error()
+      else:
+        `responseSym`.returnCode = NIMAPI_OK
+  else:
+    returnTypeHandlingStmt = quote do:
+      if `rSym`.isErr():
+        echo "FFI target proc returned error: ", `rSym`.error()
+        `responseSym`.returnCode = NIMAPI_FAIL
+        `responseSym`.errorDesc = `rSym`.error()
+      else:
+        `responseSym`.returnCode = NIMAPI_OK
+        let serRes = serialize(`rSym`.get()).valueOr:
+          echo "Failed to serialize response"
+          `responseSym`.errorDesc = error
+          `responseSym`.returnCode = NIMAPI_ERR_SERIALIZATION
+          return
+        `responseSym`.buffer = serRes.buffer
+        `responseSym`.len = serRes.size
 
   var registerStmt: NimNode
   if params.len == 1:
@@ -45,11 +69,14 @@ macro ffi*(procDef: untyped): untyped =
     registerStmt = quote do:
       ffiTable[`nameLit`] = FfiEntry(
         paramTypeName: `paramTypeNameLit`,
-        invoke: proc (buffer: pointer, len: int) {.gcsafe, raises: [].} =
+        invoke: proc (buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
           if not buffer.isNil:
+            echo "FFI target proc does not accepts argument and shall not be provided"
             deallocShared(buffer)
           try:
-            `procSym`()
+            let `rSym` = `procSym`()
+            `returnTypeHandlingStmt`
+
           except CatchableError as e:
             echo "FFI target proc raised: ", e.msg
           except Exception:
@@ -63,17 +90,24 @@ macro ffi*(procDef: untyped): untyped =
     let paramTypeNode = identDefs[1]
     let paramTypeNameLit = newLit($paramTypeNode)
     registerStmt = quote do:
+      # TODO: find out how to call chronicles log macro inside a macro... (macros.nim defines same name compile time loggings)
       ffiTable[`nameLit`] = FfiEntry(
         paramTypeName: `paramTypeNameLit`,
-        invoke: proc (buffer: pointer, len: int) {.gcsafe, raises: [].} =
-          let res = demarshal[`paramTypeNode`](buffer, len)
+        invoke: proc (buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
+          `responseSym`.buffer = nil
+          `responseSym`.len = 0
+          `responseSym`.return_code = NIMAPI_FAIL
+
+          let res = deserialize[`paramTypeNode`](buffer, len)
           if not buffer.isNil:
             deallocShared(buffer)
           if res.isErr():
-            echo "FFI demarshal failed for ", `nameLit`, ": ", res.error()
+            echo "FFI deserialize failed for ", `nameLit`, ": ", res.error()
             return
           try:
-            `procSym`(res.get())
+            let `rSym` =`procSym`(res.get())
+            `returnTypeHandlingStmt`
+
           except CatchableError as e:
             echo "FFI target proc raised: ", e.msg
           except Exception:

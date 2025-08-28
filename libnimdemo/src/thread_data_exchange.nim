@@ -9,14 +9,30 @@ const
   NIMAPI_ERR_QUEUE_FULL* : ApiCallResult = 3
   NIMAPI_ERR_UNKNOWN_PROC* : ApiCallResult = 4
   NIMAPI_ERR_NO_ANSWER* : ApiCallResult = 5
+  NIMAPI_ERR_SERIALIZATION* : ApiCallResult = 6
 
-type ApiResponse* = tuple
-    return_code: int
-    buffer: pointer
-    len: int
+type ApiResponse* = object
+    returnCode*: cint
+    errorDesc*: string
+    buffer*: pointer
+    len*: int
 
 type ApiCallRequest* = object
   req*: string
   argBuffer*: pointer
   argLen*: int
-  responseChannel*: ptr ChannelSPSCSingle[ApiResponse]
+  responseChannel*: ptr ChannelSPSCSingle[ptr ApiResponse]
+
+proc createShared*(
+    T: type ApiResponse,
+    returnCode: cint,
+    errorDesc: string = "",
+    buffer: pointer = nil,
+    len: int = 0
+): ptr type T =
+  var ret = createShared(T)
+  ret[].returnCode = returnCode
+  ret[].errorDesc = errorDesc
+  ret[].buffer = buffer
+  ret[].len = len
+  return ret

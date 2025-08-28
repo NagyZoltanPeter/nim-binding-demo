@@ -1,9 +1,8 @@
-import std/[options, atomics, locks, os]
+import std/[options, atomics, os]
 import chronicles
 import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
-import message, api
 
 var eventDispatcherEnvInitialized: AtomicFlag
 

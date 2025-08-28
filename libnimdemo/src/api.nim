@@ -2,36 +2,19 @@
 # exports the main API in this file. Note that you cannot rename this file
 # but you can remove it if you wish.
 
-import stew/byteutils, chronos, times
+import stew/byteutils, chronos
 import chronicles
 import protobuf_serialization
 import event_dispatcher
 import message
-import ffi
+import ffi, serde
 
 var managedMsgs {.threadvar.}: seq[WakuMessage]
 
-proc serializeToBuffer[T](obj: T): Result[tuple[buffer: pointer, size: int], void] =
-  let bufferSize = Protobuf.computeSize(obj)
-  var buffer = allocShared0(bufferSize)
-
-  if buffer == nil:
-    error "Cannot allocate memory for protobuf serialization."
-    return err()
-  var stream = unsafeMemoryOutput(buffer, bufferSize)
-  var writer = ProtobufWriter.init(stream)
-  let writeResult = catch: writeValue(writer, obj)
-  close(stream)
-
-  if writeResult.isErr():
-    error "Failed to serialize", error = writeResult.error().msg, obj = $obj
-    return err()  
-  return ok((buffer: buffer, size: bufferSize))
-
 proc emitOnReceivedEvent(msg: WakuMessage) {.async.} =
   let event = onReceivedEvent(msg : msg)
-  let serialized = serializeToBuffer(event).valueOr:
-    error "Cannot emit OnReceivedEvent due to serialization error"
+  let serialized = serialize(event).valueOr:
+    error "Cannot emit OnReceivedEvent due to serialization error", error = error
     return
 
   info "emitting onReceivedEvent", msg = $msg
@@ -49,7 +32,7 @@ proc processMessages() {.async.} =
 
     managedMsgs = @[]
 
-proc init*() {.ffi.} =
+proc init*(): Result[void, string]{.ffi.} =
   managedMsgs.add(
     WakuMessage(payload: cast[seq[byte]]("Test message #1"), content_topic: "/zoltan/1/demo/0")
   )
@@ -58,9 +41,12 @@ proc init*() {.ffi.} =
   asyncSpawn processMessages()
 
   info "API initialized, processing started"
+  return ok()
 
-proc send*(msg: WakuMessage) {.ffi.} =
+
+proc send*(msg: WakuMessage): Result[int32, string] {.ffi.} =
   let payload = string.fromBytes(msg.payload)
   info "send API called", msg = $msg, payload = payload
   managedMsgs.add(msg)
   info "message stored at", index = (managedMsgs.len - 1)
+  return ok(int32(managedMsgs.len - 1))

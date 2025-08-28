@@ -1,6 +1,7 @@
 import std/[options, atomics, locks, os, tables]
 import chronicles
 import chronos, chronos/threadsync
+import taskpools/channels_spsc_single
 import lockfreequeues
 import protobuf_serialization
 import message, api, thread_data_exchange, ffi
@@ -44,7 +45,17 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
     if not req.argBuffer.isNil: deallocShared(req.argBuffer)
     return
   try:
-    entry.invoke(req.argBuffer, req.argLen)
+    # let response = createShared(ApiResponse, int(NIMAPI_FAIL))
+    let response = ApiResponse.createShared(NIMAPI_FAIL)
+    if req.responseChannel == nil: # async call
+        entry.invoke(req.argBuffer, req.argLen, response[], AsyncCall)
+    else: # sync call
+      entry.invoke(req.argBuffer, req.argLen, response[], SyncCall)
+      if not req.responseChannel[].trySend(response):
+        error "Failed to send response", name = req.req
+        if not response[].buffer.isNil: deallocShared(response[].buffer)
+        deallocShared(response)
+        
   except CatchableError as e:
     error "FFI invoke raised", name = req.req, err = e.msg
   except Exception as e:
