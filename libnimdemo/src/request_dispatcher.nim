@@ -1,10 +1,10 @@
-import std/[options, atomics, locks, os, tables]
+import std/[options, atomics, tables]
 import chronicles
 import chronos, chronos/threadsync
 import taskpools/channels_spsc_single
 import lockfreequeues
 import protobuf_serialization
-import message, api, thread_data_exchange, ffi
+import thread_data_exchange, ffi
 
 var requestDispatcherEnvInitialized: AtomicFlag
 
@@ -13,12 +13,15 @@ type RequestContext* = object
   incomingQueue*: Mupsic[1024, 16, ApiCallRequest]
   ffiLookupTable*: FFILookupTable
   requestSignal*: ThreadSignalPtr 
+  dispatcherThread: Thread[ptr RequestContext]
+  requestDispatcherShallRun: Atomic[bool]
+  readyToProcessRequests: Atomic[bool]
+  
+  readyToProcessRequestsSignal: ThreadSignalPtr
+
+
 
 var requestContextP*: ptr RequestContext
-
-# Thread synchronization
-var dispatcherThread: Thread[ptr RequestContext]
-var isRequestDispatcherRunning: Atomic[bool]
 
 proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result = RequestContext.createShared()
@@ -26,6 +29,12 @@ proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result.requestSignal = ThreadSignalPtr.new().valueOr:
     error "Cannot create request signaling"
     quit(QuitFailure)
+  result.requestDispatcherShallRun.store(true)
+  result.readyToProcessRequests.store(false)
+  result.readyToProcessRequestsSignal = ThreadSignalPtr.new().valueOr:
+    error "Cannot create readyToProcessRequests signaling"
+    quit(QuitFailure)
+
 
 proc destroyRequestContext(ctx: ptr RequestContext) =
   if ctx != nil:
@@ -48,8 +57,10 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
     # let response = createShared(ApiResponse, int(NIMAPI_FAIL))
     let response = ApiResponse.createShared(NIMAPI_FAIL)
     if req.responseChannel == nil: # async call
+        info "Async dispatch", request = req.req
         entry.invoke(req.argBuffer, req.argLen, response[], AsyncCall)
     else: # sync call
+      info "Synch dispatch", request = req.req
       entry.invoke(req.argBuffer, req.argLen, response[], SyncCall)
       if not req.responseChannel[].trySend(response):
         error "Failed to send response", name = req.req
@@ -63,7 +74,8 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
 
 proc processRequests(ctx: ptr RequestContext) {.async.} =
   # Main dispatch loop
-  while isRequestDispatcherRunning.load:
+  ctx[].readyToProcessRequests.store(true)
+  while ctx[].requestDispatcherShallRun.load():
     var item = ctx[].incomingQueue.pop()
     # process all request in the queue, do not wait for signal
     while item.isSome():
@@ -72,6 +84,8 @@ proc processRequests(ctx: ptr RequestContext) {.async.} =
       item = ctx[].incomingQueue.pop()
 
     await ctx[].requestSignal.wait()
+
+  ctx[].readyToProcessRequests.store(false)
 
 # Thread procedure for dispatching calls
 proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread, gcsafe.} =
@@ -86,13 +100,11 @@ proc createRequestDispatcherEnv*() =
     info "Initializing run environment"
 
     # Initialize thread running flag
-    isRequestDispatcherRunning.store(true)
-
     requestContextP = createRequestContext(ffiTable)
     # Start the dispatcher thread
     try:
       info "About to create dispatcher thread"
-      createThread(dispatcherThread, dispatcherThreadProc, requestContextP)
+      createThread(requestContextP[].dispatcherThread, dispatcherThreadProc, requestContextP)
       info "Dispatcher thread created successfully"
     except ValueError, ResourceExhaustedError:
       error "Failed to create dispatcher thread"
@@ -100,7 +112,22 @@ proc createRequestDispatcherEnv*() =
 
 proc shutdownRequestDispatcher*() =
   info "Stopping request dispatcher thread"
-  isRequestDispatcherRunning.store(false)
+  requestContextP[].requestDispatcherShallRun.store(false)
   discard requestContextP[].requestSignal.fireSync()
-  joinThread(dispatcherThread)
+  joinThread(requestContextP[].dispatcherThread)
   destroyRequestContext(requestContextP)
+
+proc waitForRequestProcessingReady*(): bool =
+  if requestContextP == nil:
+    error "Request context is not yet initialized"
+    return false
+  info "Waiting for request processing to be ready"
+  let result = requestContextP[].readyToProcessRequestsSignal.waitSync(10.seconds).valueOr:
+    error "Having issue waiting for request processing to be ready", error = error
+    return false
+  info "Request processing to be ready"
+  # while requestContextP[].readyToProcessRequests.load() == false:
+  #   if not requestContextP[].requestDispatcherShallRun.load():
+  #     return false
+  #   waitFor sleepAsync(10.milliseconds)
+  return true

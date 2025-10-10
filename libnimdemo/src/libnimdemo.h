@@ -12,7 +12,7 @@ extern "C" {
 void libnimdemo_initialize(void);
 void libnimdemo_teardown(void);
 
-enum ApiCallResult {
+enum ApiCallResultCode {
 	NIMAPI_FAIL = -1,
     NIMAPI_OK = 0,
 	NIMAPI_ERR_NOT_INITIALIZED = 1,
@@ -25,7 +25,7 @@ enum ApiCallResult {
 
 // Main API function
 int asyncApiCall(const char* req, void* argBuffer, int argLen);
-int syncApiCall(const char* req, void* argBuffer, int argLen, void** respBuffer, int* respLen);
+int syncApiCall(const char* req, void* argBuffer, int argLen, void** respBuffer, int* respLen, char** errorDesc );
 
 void* allocateArgBuffer(int size);
 void  deallocateArgBuffer(void* argBuffer);

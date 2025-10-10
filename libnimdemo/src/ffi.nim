@@ -33,11 +33,9 @@ macro ffi*(procDef: untyped): untyped =
         "Expected return type of 'Result[T, string]' got '" & repr(returnType) & "'", procDef)
 
   let isVoidResult = eqIdent(okReturnType, "void")
-  echo "isVoidResult is ", repr(isVoidResult)
   var returnTypeHandlingStmt: NimNode
   let rSym = genSym(nskLet, "r")
   let responseSym = genSym(nskParam, "response")
-  echo "rSym is ", repr(rSym)
   if isVoidResult:
     returnTypeHandlingStmt = quote do:
       if `rSym`.isErr():
@@ -117,3 +115,4 @@ macro ffi*(procDef: untyped): untyped =
     error "FFI proc '" & nameStr & "' must have zero or one parameter"
 
   result = newStmtList(procDef, registerStmt)
+  debugEcho "Generated FFI proc: ", repr(result)

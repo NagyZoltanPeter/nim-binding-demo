@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+// Wrapper Proto types to support basic types in the API
+// It is not meant to be used directly in API code.
+
+message ApiBool {
+  bool value = 1;
+}
+
+message ApiInt {
+  int32 value = 1;
+}
+
+message ApiUInt {
+  uint32 value = 1;
+}
+
+message ApiInt64 {
+  int64 value = 1;
+}
+
+message ApiUInt64 {
+  uint64 value = 1;
+}
+
+message ApiFloat {
+  float value = 1;
+}
+
+message ApiDouble {
+  double value = 1;
+}
+
+message ApiString {
+  string value = 1;
+}
+
+message ApiBytes {
+  bytes value = 1;
+}
+
+message ApiStrings {
+  repeated string value = 1;
+}

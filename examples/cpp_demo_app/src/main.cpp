@@ -8,6 +8,7 @@
 
 using namespace std::chrono_literals;
 
+
 int main(int argc, char *argv[])
 {
     // Initialize Google's protobuf library
@@ -45,7 +46,10 @@ int main(int argc, char *argv[])
         std::cout << "CPP side>Content topic: " << waku_msg.content_topic() << std::endl;
 
         // Call the send function with the WakuMessage
-        send(waku_msg);
+        auto retCode = send(waku_msg, [](const onReceivedEvent& msg) {
+            std::cout << "CPP side>Received message: " << msg.msg().content_topic() <<
+                " with payload: " << msg.msg().payload() << std::endl;
+        });
 
         std::cout << "CPP side>Message sent successfully!" << std::endl;
 
@@ -55,6 +59,24 @@ int main(int argc, char *argv[])
         waku_msg.set_payload("Now the second message from CPP");
         send(waku_msg);
         std::cout << "CPP side>2nd Message sent successfully!" << std::endl;
+
+        // Demonstrate map (transform success value) + or_else (handle error)
+        auto peerCountResult = getPeers()
+            .map([](const std::vector<std::string>& peers) -> std::size_t {
+                std::cout << "CPP side>Connected peers:" << std::endl;
+                for (const auto& peer : peers) {
+                    std::cout << " - " << peer << std::endl;
+                }
+                return peers.size();
+            })
+            .or_else([](const ApiError& err) -> tl::expected<std::size_t, ApiError> {
+                std::cerr << "CPP side>Failed to get peers: " << err.desc << " (code " << err.code << ")" << std::endl;
+                return tl::unexpected(err);
+            });
+
+        if (peerCountResult) {
+            std::cout << "CPP side>Total peers: " << *peerCountResult << std::endl;
+        }
 
         std::this_thread::sleep_for(10s);
         std::cout << "CPP side>Slept 1500" << std::endl;

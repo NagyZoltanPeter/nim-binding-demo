@@ -1,4 +1,4 @@
-import std/[options, atomics, locks, os]
+import std/[atomics]
 import chronicles
 import chronos/threadsync
 import lockfreequeues
@@ -21,16 +21,21 @@ import api
 proc libnimdemoNimMain() {.importc.}
 
 # To control when the library has been initialized
-var libInitialized: AtomicFlag
-var runEnvInitialized: AtomicFlag
+var libInitialized: Atomic[bool]
 
 proc initializeLibrary() =
-  if not libInitialized.testAndSet():
+  # Atomically flip from false -> true; only the run init once
+  var expectedInitialized: bool = false
+  if libInitialized.compareExchange(expectedInitialized, true):
     ## Every Nim library needs to call `<yourprefix>NimMain` once exactly, to initialize the Nim runtime.
     ## Being `<yourprefix>` the value given in the optional compilation flag --nimMainPrefix:yourprefix
     libnimdemoNimMain()
     when declared(setupForeignThreadGc):
       setupForeignThreadGc()
+    info "Library initialized"
+
+proc isInitialized(): bool =
+  return libInitialized.load()
 
 #### Library interface
 proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
@@ -42,6 +47,11 @@ proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =
 proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Async API call", req = reqStr, argLen = argLen
+  if not isInitialized() and not waitForRequestProcessingReady():
+    error "Library not initialized, cannot process request", request = reqStr
+    deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_NOT_INITIALIZED
+
 
   # Create request item
   let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: nil)
@@ -58,11 +68,16 @@ proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynli
   return NIMAPI_OK
 
 var threadResponseChannel {.threadvar.} : ChannelSPSCSingle[ptr ApiResponse]
+zeroMem(addr threadResponseChannel, sizeof(ChannelSPSCSingle[ptr ApiResponse]))
 
 proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint, 
-                  respBuffer: var pointer, respLen: var cint): cint {.dynlib, exportc, cdecl.} =
+                  respBuffer: var pointer, respLen: var cint, errorDesc: var cstring): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Sync API call", req = reqStr, argLen = argLen
+  if not isInitialized() and not waitForRequestProcessingReady():
+    error "Library not initialized, cannot process request", request = reqStr
+    deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_NOT_INITIALIZED
 
   # reset response ahead
   respBuffer = nil
@@ -83,12 +98,17 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
   var callResult : ptr ApiResponse
   let recvOk = threadResponseChannel.tryRecv(callResult)
   if not recvOk:
-    error "waku thread could not receive a request"
+    error "waku thread could not receive a request after calling ", request = reqStr 
     return NIMAPI_ERR_NO_ANSWER
   
   respBuffer = callResult[].buffer
   respLen = cint(callResult[].len)
   let returnCode = callResult[].returnCode
+  if returnCode != NIMAPI_OK and callResult[].errorDesc.len > 0:
+    errorDesc = cstring(callResult[].errorDesc) # need to allocate string and copy into
+  else:
+    errorDesc = nil
+
   deallocShared(callResult)
   return returnCode
 

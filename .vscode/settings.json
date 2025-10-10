@@ -16,6 +16,8 @@
         "flat_map": "cpp",
         "flat_set": "cpp",
         "format": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "optional": "cpp",
+        "expected": "cpp"
     }
 }

@@ -50,3 +50,8 @@ proc send*(msg: WakuMessage): Result[int32, string] {.ffi.} =
   managedMsgs.add(msg)
   info "message stored at", index = (managedMsgs.len - 1)
   return ok(int32(managedMsgs.len - 1))
+
+proc getPeers*(): Result[seq[string], string] {.ffi.} =
+  let peers = @["peer1", "peer2", "peer3"]
+  info "getPeers API called. return with", peers = $peers
+  return ok(peers)

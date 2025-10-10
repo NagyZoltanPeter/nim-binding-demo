@@ -1,4 +1,4 @@
-import std/[options, atomics, os]
+import std/[options, atomics]
 import chronicles
 import chronos, chronos/threadsync
 import lockfreequeues
@@ -49,7 +49,9 @@ proc dispatcherThreadProc(ctx: ptr EventContext) {.thread.} =
 
     while item.isSome():
       info "Processing event", req = item.get().event
-      dispatchEvent(item.get().event, item.get().argBuffer, cast[cint](item.get().argLen))
+      # it is safe to cast event string to cstring here as we can expect from dispatchEvent implementation
+      # to copy it right away and dispatchEvent call is sync.
+      dispatchEvent(cstring(item.get().event), item.get().argBuffer, cast[cint](item.get().argLen))
       item = ctx[].outgoingQueue.pop()
 
     waitFor ctx[].eventSignal.wait()

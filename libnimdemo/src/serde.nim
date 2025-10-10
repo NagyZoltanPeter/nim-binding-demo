@@ -1,6 +1,7 @@
 import std/[typetraits]
 import results
 import protobuf_serialization
+import api_types
 
 # Generic safe deserialization from a raw buffer allocated with allocShared0 / allocShared
 proc deserialize*[T](buffer: pointer, len: int): Result[T, string] {.raises: [].} =
@@ -21,31 +22,31 @@ proc deserialize*[T](buffer: pointer, len: int): Result[T, string] {.raises: [].
   # raises:[] forbids listing close which may raise IOError; let GC clean it up.
 
 template wrapForSerialize[T](obj: T): untyped =
-  when T is int32:
-    type I32Wrapper {.proto3.} = object
-      v {.fieldNumber: 1, sint.}: int32
-    I32Wrapper(v: obj)
+  when T is bool:
+    ApiBool(value: obj)
+  elif T is int32:
+    ApiInt(value: obj)
   elif T is uint32:
-    type U32Wrapper {.proto3.} = object
-      v {.fieldNumber: 1, pint.}: uint32
-    U32Wrapper(v: obj)
+    ApiUInt(value: obj)
   elif T is int64:
-    type I64Wrapper {.proto3.} = object
-      v {.fieldNumber: 1, sint.}: int64
-    I64Wrapper(v: obj)
+    ApiInt64(value: obj)
   elif T is uint64:
-    type U64Wrapper {.proto3.} = object
-      v {.fieldNumber: 1, pint.}: uint64
-    U64Wrapper(v: obj)
-  elif T is (bool or float32 or float64 or string or seq[byte]):
-    type ScalarWrapper {.proto3.} = object
-      v {.fieldNumber: 1.}: T
-    ScalarWrapper(v: obj)
+    ApiUInt64(value: obj)
+  elif T is float32:
+    ApiFloat(value: obj)
+  elif T is float64:
+    ApiDouble(value: obj)
+  elif T is string:
+    ApiString(value: obj)
+  elif T is seq[byte]:
+    ApiBytes(value: obj)
+  elif T is seq[string]:
+    ApiStrings(value: obj)
   else:
     obj
 
 proc computeSerializedSize*[T](obj: T): Result[int, string] =
-  when T is (int32 or uint32 or int64 or uint64 or bool or float32 or float64 or string or seq[byte]):
+  when T is (int32 or uint32 or int64 or uint64 or bool or float32 or float64 or string or seq[byte] or seq[string]):
     let wrapped = wrapForSerialize(obj)
     ok(Protobuf.computeSize(wrapped))
   else:
@@ -54,7 +55,7 @@ proc computeSerializedSize*[T](obj: T): Result[int, string] =
 proc writeSerialized*[T](obj: T, buffer: pointer, size: int): Result[void, string] =
   var stream = unsafeMemoryOutput(buffer, size)
   var writer = ProtobufWriter.init(stream)
-  when T is (int32 or uint32 or int64 or uint64 or bool or float32 or float64 or string or seq[byte]):
+  when T is (int32 or uint32 or int64 or uint64 or bool or float32 or float64 or string or seq[byte] or seq[string]):
     let wrapped = wrapForSerialize(obj)
     let writeResult = catch:
       writeValue(writer, wrapped)

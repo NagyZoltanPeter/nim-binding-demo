@@ -10,20 +10,59 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(Protobuf REQUIRED)
 find_package(absl REQUIRED)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    tl_expected
+    GIT_REPOSITORY https://github.com/TartanLlama/expected.git
+    GIT_TAG        v1.3.1
+)
+
+FetchContent_MakeAvailable(tl_expected)
+
+
 # Generate protobuf sources for the binding API messages
 if(NOT DEFINED PROJECT_ROOT_DIR)
     # Fallback when built standalone
     get_filename_component(PROJECT_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 endif()
 
-set(PROTO_FILES ${PROJECT_ROOT_DIR}/proto/message.proto)
+# Define protobuf source directory
+set(PROTO_DIR "${PROJECT_ROOT_DIR}/proto")
+
+# Collect all .proto files from the proto directory
+file(GLOB_RECURSE PROTO_FILES
+    "${PROTO_DIR}/*.proto"
+)
+
+# Validate that proto files exist
+if(NOT PROTO_FILES)
+    message(FATAL_ERROR "No .proto files found in ${PROTO_DIR}. Ensure protobuf files are present.")
+endif()
+
+# Validate protobuf package is available
+if(NOT Protobuf_FOUND)
+    message(FATAL_ERROR "Protobuf package not found. Please install protobuf development libraries.")
+endif()
+
+# Generate C++ sources and headers from protobuf files
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTO_FILES})
+
+# Add custom target for protobuf generation to enable proper dependency tracking
+add_custom_target(generate_proto_files
+    DEPENDS ${PROTO_SRCS} ${PROTO_HDRS}
+    COMMENT "Generating C++ files from protobuf definitions"
+)
+
 
 # Library target
 add_library(cpp_binding STATIC
-    src/event_bridge.cpp
-    ${PROTO_SRCS}
+src/event_bridge.cpp
+${PROTO_SRCS}
 )
+
+# Ensure protobuf files are generated before building the library
+add_dependencies(cpp_binding generate_proto_files)
 
 # Ensure position independent code for wider compatibility when linking into shared libs
 set_target_properties(cpp_binding PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -34,6 +73,7 @@ target_include_directories(cpp_binding
         $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
     $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/libnimdemo/src>
     $<BUILD_INTERFACE:${PROJECT_ROOT_DIR}/libnimdemo/build>
+    $<BUILD_INTERFACE:${tl_expected_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
