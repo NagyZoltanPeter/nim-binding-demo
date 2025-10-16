@@ -18,11 +18,15 @@ type ApiResponse* = object
     buffer*: pointer
     len*: int
 
+type InvokeType* = enum
+  AsyncCall
+  SyncCall
+
 type ApiCallRequest* = object
   req*: string
   argBuffer*: pointer
   argLen*: int
-  responseChannel*: ptr ChannelSPSCSingle[ptr ApiResponse]
+  invokeType*: InvokeType
 
 proc createShared*(
     T: type ApiResponse,

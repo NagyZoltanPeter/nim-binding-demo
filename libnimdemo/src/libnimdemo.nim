@@ -1,6 +1,6 @@
 import std/[atomics]
 import chronicles
-import chronos/threadsync
+import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 import taskpools/channels_spsc_single
@@ -47,14 +47,14 @@ proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =
 proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Async API call", req = reqStr, argLen = argLen
-  if not isInitialized() and not waitForRequestProcessingReady():
+  if not (isInitialized() and waitForRequestProcessingReady()):
     error "Library not initialized, cannot process request", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_NOT_INITIALIZED
 
 
   # Create request item
-  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: nil)
+  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), invokeType: AsyncCall)
 
   let producer =   requestContextP[].incomingQueue.getProducer()
   if not producer.push(item):
@@ -74,7 +74,7 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
                   respBuffer: var pointer, respLen: var cint, errorDesc: var cstring): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Sync API call", req = reqStr, argLen = argLen
-  if not isInitialized() and not waitForRequestProcessingReady():
+  if not (isInitialized() and waitForRequestProcessingReady()):
     error "Library not initialized, cannot process request", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_NOT_INITIALIZED
@@ -84,7 +84,7 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
   respLen = 0
 
   # Create request item
-  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), responseChannel: addr threadResponseChannel)
+  let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), invokeType: SyncCall)
 
   let producer =   requestContextP[].incomingQueue.getProducer()
   if not producer.push(item):
@@ -96,11 +96,21 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
     discard requestContextP[].requestSignal.fireSync()
 
   var callResult : ptr ApiResponse
-  let recvOk = threadResponseChannel.tryRecv(callResult)
-  if not recvOk:
-    error "waku thread could not receive a request after calling ", request = reqStr 
+  requestContextP[].syncCallResponse.store(nil)
+  let recvOk = requestContextP[].syncCallWaiter.waitSync(10.seconds).valueOr:
+    error "Failed to wait for sync call response", request = reqStr
     return NIMAPI_ERR_NO_ANSWER
-  
+
+  if not recvOk:
+    error "Timed out waiting for sync call", request = reqStr
+    return NIMAPI_ERR_NO_ANSWER
+  else:
+    callResult = requestContextP[].syncCallResponse.load()
+    if callResult == nil:
+      error "Received nil response for sync call", request = reqStr
+      return NIMAPI_ERR_NO_ANSWER
+
+
   respBuffer = callResult[].buffer
   respLen = cint(callResult[].len)
   let returnCode = callResult[].returnCode

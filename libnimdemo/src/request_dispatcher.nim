@@ -16,8 +16,9 @@ type RequestContext* = object
   dispatcherThread: Thread[ptr RequestContext]
   requestDispatcherShallRun: Atomic[bool]
   readyToProcessRequests: Atomic[bool]
-  
   readyToProcessRequestsSignal: ThreadSignalPtr
+  syncCallWaiter*: ThreadSignalPtr
+  syncCallResponse*: Atomic[ptr ApiResponse]
 
 
 
@@ -34,6 +35,10 @@ proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
   result.readyToProcessRequestsSignal = ThreadSignalPtr.new().valueOr:
     error "Cannot create readyToProcessRequests signaling"
     quit(QuitFailure)
+  result.syncCallWaiter = ThreadSignalPtr.new().valueOr:
+    error "Cannot create sync call signaling"
+    quit(QuitFailure)
+  result.syncCallResponse.store(nil)
 
 
 proc destroyRequestContext(ctx: ptr RequestContext) =
@@ -56,13 +61,14 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
   try:
     # let response = createShared(ApiResponse, int(NIMAPI_FAIL))
     let response = ApiResponse.createShared(NIMAPI_FAIL)
-    if req.responseChannel == nil: # async call
+    if req.invokeType == AsyncCall:
         info "Async dispatch", request = req.req
         entry.invoke(req.argBuffer, req.argLen, response[], AsyncCall)
     else: # sync call
       info "Synch dispatch", request = req.req
       entry.invoke(req.argBuffer, req.argLen, response[], SyncCall)
-      if not req.responseChannel[].trySend(response):
+      ctx[].syncCallResponse.store(response)
+      ctx[].syncCallWaiter.fireSync().isOkOr:
         error "Failed to send response", name = req.req
         if not response[].buffer.isNil: deallocShared(response[].buffer)
         deallocShared(response)
@@ -75,6 +81,7 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
 proc processRequests(ctx: ptr RequestContext) {.async.} =
   # Main dispatch loop
   ctx[].readyToProcessRequests.store(true)
+  discard ctx[].readyToProcessRequestsSignal.fireSync()
   while ctx[].requestDispatcherShallRun.load():
     var item = ctx[].incomingQueue.pop()
     # process all request in the queue, do not wait for signal
@@ -121,13 +128,11 @@ proc waitForRequestProcessingReady*(): bool =
   if requestContextP == nil:
     error "Request context is not yet initialized"
     return false
+  if requestContextP[].readyToProcessRequests.load():
+      return true
   info "Waiting for request processing to be ready"
   let result = requestContextP[].readyToProcessRequestsSignal.waitSync(10.seconds).valueOr:
     error "Having issue waiting for request processing to be ready", error = error
     return false
-  info "Request processing to be ready"
-  # while requestContextP[].readyToProcessRequests.load() == false:
-  #   if not requestContextP[].requestDispatcherShallRun.load():
-  #     return false
-  #   waitFor sleepAsync(10.milliseconds)
+  info "Request processing ready"
   return true

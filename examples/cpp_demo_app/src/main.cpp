@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
         }
 
         std::this_thread::sleep_for(10s);
-        std::cout << "CPP side>Slept 1500" << std::endl;
+        std::cout << "CPP side>Slept 10000" << std::endl;
     }
     catch (const std::exception &e)
     {

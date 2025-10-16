@@ -57,7 +57,7 @@ inline ApiCallResultCode init() {
 }
 
 inline ApiCallResultCode send(const WakuMessage& waku_msg, std::function<void(const onReceivedEvent&)> onReceiveCb = nullptr) {
-    EventDispatcher::registerHandler<onReceivedEvent>(std::move(onReceiveCb));
+    if (onReceiveCb) { EventDispatcher::registerHandler<onReceivedEvent>(std::move(onReceiveCb)); }
     const int sizeRequired = static_cast<int>(waku_msg.ByteSizeLong());
     void* argBuffer = allocateArgBuffer(sizeRequired);
     if (!waku_msg.SerializeToArray(argBuffer, sizeRequired)) {

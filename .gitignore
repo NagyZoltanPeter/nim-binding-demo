@@ -3,6 +3,11 @@
 **/bin/*
 **/lib/*
 include/*
+share/*
+# Ignore CMake generated files
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/Makefile
 **/CMakeFiles/*
 # Ignore all files in proto directory except .proto files
 proto/[!.]**
