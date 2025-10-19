@@ -129,7 +129,7 @@ proc buildLibrary(srcName: string, outName: string, srcDir = "./", params = "", 
     exec cmd
     
 task buildlib, "Builds static and dynamic library artifacts":
-  let srcName = "libnimdemo"
+  let srcName = "ffi_interface"
   let outName = "libnimdemo"
   buildLibrary(srcName, outName, "src/", " -d:chronicles_log_level='TRACE' ", "static")
   # buildLibrary(name, "src/", " -d:chronicles_log_level='TRACE' ", "dynamic")

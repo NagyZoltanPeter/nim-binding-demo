@@ -19,12 +19,7 @@ if(NIMBLE_TOOL)
     OUTPUT ${DEMOLIB_STATIC_LIB}
         COMMAND ${NIMBLE_TOOL} buildlib
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/libnimdemo.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/api.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/event_dispatcher.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/message.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/request_dispatcher.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/demolib/context.nim
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.nim
         ${CMAKE_CURRENT_SOURCE_DIR}/libnimdemo.nimble
     COMMENT "Building Nim libnimdemo library using nimble"
         VERBATIM
@@ -45,14 +40,9 @@ else()
         --nimMainPrefix:libnimdemo 
                 --skipParentCfg:on
                 -d:chronicles_log_level='TRACE'
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/libnimdemo.nim
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ffi_interface.nim
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/libnimdemo.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/api.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/event_dispatcher.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/message.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/request_dispatcher.nim
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/demolib/context.nim
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/*.nim
     COMMENT "Building Nim libnimdemo library using direct nim compilation"
         VERBATIM
     )

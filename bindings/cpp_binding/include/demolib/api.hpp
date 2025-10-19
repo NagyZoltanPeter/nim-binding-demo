@@ -7,7 +7,7 @@
 //  - EventName specializations for known events
 //  - Convenience API wrappers (init, send)
 
-#include "libnimdemo.h"         // C API from Nim
+#include "ffi_interface.h"         // C API from Nim
 #include "message.pb.h"         // Protobuf messages
 #include "api_types.pb.h"
 #include "demolib/event_dispatcher.hpp"
