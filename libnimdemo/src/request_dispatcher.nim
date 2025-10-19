@@ -1,7 +1,6 @@
 import std/[options, atomics, tables]
 import chronicles
 import chronos, chronos/threadsync
-import taskpools/channels_spsc_single
 import lockfreequeues
 import protobuf_serialization
 import thread_data_exchange, ffi
@@ -131,8 +130,8 @@ proc waitForRequestProcessingReady*(): bool =
   if requestContextP[].readyToProcessRequests.load():
       return true
   info "Waiting for request processing to be ready"
-  let result = requestContextP[].readyToProcessRequestsSignal.waitSync(10.seconds).valueOr:
+  result = requestContextP[].readyToProcessRequestsSignal.waitSync(10.seconds).valueOr:
     error "Having issue waiting for request processing to be ready", error = error
     return false
   info "Request processing ready"
-  return true
+  return result

@@ -112,14 +112,3 @@ macro ffi*(procDef: untyped): untyped =
 
   result = newStmtList(procDef, registerStmt)
   debugEcho "Generated FFI proc: ", repr(result)
-
-# macro api*(fileDef undefined): untyped =
-#   if fileDef.kind != nnkFile:
-#     error "'.api' can only be applied to a file"
-#   var newStmts = newSeq[NimNode]()
-#   for stmt in fileDef:
-#     if stmt.kind == nnkProcDef:
-#       newStmts.add(ffi(stmt))
-#     else:
-#       newStmts.add(stmt)
-#   result = newStmtList(newStmts)
