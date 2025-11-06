@@ -14,14 +14,7 @@
 #include "demolib/event_tag.hpp"
 
 // ToDo: find proper place for this def
-#include "demolib/expected.hpp"
-
-struct ApiError {
-    int code;
-    std::string desc;
-};
-
-template <typename T> using ApiResult = tl::expected<T, ApiError>;
+#include "demolib/api_result.hpp"
 
 void cpp_binding_initialize(void) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
@@ -58,15 +51,19 @@ inline ApiCallResultCode init() {
 
 inline ApiCallResultCode send(const WakuMessage& waku_msg, std::function<void(const onReceivedEvent&)> onReceiveCb = nullptr) {
     if (onReceiveCb) { EventDispatcher::registerHandler<onReceivedEvent>(std::move(onReceiveCb)); }
-    const int sizeRequired = static_cast<int>(waku_msg.ByteSizeLong());
-    void* argBuffer = allocateArgBuffer(sizeRequired);
-    if (!waku_msg.SerializeToArray(argBuffer, sizeRequired)) {
-        std::cerr << "Failed to serialize WakuMessage" << std::endl;
-        deallocateArgBuffer(argBuffer);
-        return ApiCallResultCode::NIMAPI_FAIL;
-    }
-    return (ApiCallResultCode)asyncApiCall("send", argBuffer, sizeRequired);
-    // Ownership of argBuffer is transferred to the Nim library.
+    void* argBuffer = nullptr;
+    size_t bufferSize = 0;
+    return serializeApiType(waku_msg, argBuffer, bufferSize)
+        .and_then([&]() -> expected<ApiCallResultCode, std::string> {
+            // Ownership of argBuffer is transferred to the Nim library on success
+            ApiCallResultCode rc = static_cast<ApiCallResultCode>(asyncApiCall("send", argBuffer, static_cast<int>(bufferSize)));
+            return expected<ApiCallResultCode, std::string>{ rc };
+        })
+        .or_else([](const std::string& err) -> expected<ApiCallResultCode, std::string> {
+            std::cerr << "Failed to serialize WakuMessage: " << err << std::endl;
+            return expected<ApiCallResultCode, std::string>{ ApiCallResultCode::NIMAPI_FAIL };
+        })
+        .value();
 }
 
 inline ApiResult<std::vector<std::string>> getPeers() {
@@ -80,18 +77,13 @@ inline ApiResult<std::vector<std::string>> getPeers() {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
         deallocateArgBuffer(errorDesc);
         std::cerr << "Api call error: " << errorMsg << std::endl;
-        return tl::unexpected(ApiError{result, errorMsg});
+        return ApiUnexpected(ApiError{result, errorMsg});
     }
 
-    std::vector<std::string> peers;
-    if (returnBuffer && returnLen > 0) {
-        ApiStrings peerList;
-        if (peerList.ParseFromArray(returnBuffer, returnLen)) {
-            for (const auto& peer : peerList.value()) {
-                peers.push_back(peer);
-            }
-        }
-        deallocateArgBuffer(returnBuffer);
+    auto peers = deserializeApiType<std::vector<std::string>>(returnBuffer, returnLen);
+    if (peers) {
+        return peers.value();
     }
-    return peers;
+    std::cerr << "Failed to deserialize peer list: " << peers.error() << std::endl;
+    return ApiUnexpected(ApiError{ApiCallResultCode::NIMAPI_FAIL, "Failed to deserialize peer list"});
 }

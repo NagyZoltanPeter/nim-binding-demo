@@ -9,6 +9,7 @@
 #include "ffi_interface.h"
 #include "message.pb.h"
 #include "demolib/event_tag.hpp"
+#include "demolib/serde.hpp"
 
 class EventHandlerBase {
 public:
@@ -23,12 +24,11 @@ public:
     explicit HandlerImpl(Callback cb) : callback(std::move(cb)) {}
 
     void call(void* data, size_t size) const override {
-        MessageT msg;
-        const bool parseSucceeded = msg.ParseFromArray(data, static_cast<int>(size));
-        deallocateArgBuffer(data);
-        if (parseSucceeded) {
+        auto msg = deserializeApiType<MessageT>(data, size);
+
+        if (msg) {
             if (callback) {
-                callback(msg);
+                callback(msg.value());
             }
             else {
                 std::cerr << "CPP side> No callback defined for event: "
@@ -36,7 +36,7 @@ public:
             }
         } else {
             std::cerr << "CPP side> Failed to parse protobuf message for event: "
-                      << typeid(MessageT).name() << '\n';
+                      << typeid(MessageT).name() << ": " << msg.error() << '\n';
         }
     }
 

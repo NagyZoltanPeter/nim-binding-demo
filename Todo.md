@@ -23,14 +23,17 @@ As not always needed to define complex structures for each api calls and respons
     -      Result[<Proto defined struct>, ApiResult]
 - Protobuf definition schema
   - Data structures must be defined as any regular `message` type
-  - Api Calls shall follow the prefixing convention
-    - `ApiCall`+Methodname for Api requests
-    - `OnEvent`+Eventname for events
-  - Inside the message definition, fields must be prefixed as:
-    - `Arg`+ArgumentName
-      - Currently only one argument is supported, multiple arguments must be boundled into separate type definition
-    - `Ret`+ReturnValueName
-      - Only one return value is supported, multiple return values must be boundled into separate type definition
+
+
+  - THIS IS NOT NEEDED IF WE GENERATE CODE FROM NIM MACROS
+    - Api Calls shall follow the prefixing convention
+      - `ApiCall`+Methodname for Api requests
+      - `OnEvent`+Eventname for events
+    - Inside the message definition, fields must be prefixed as:
+      - `Arg`+ArgumentName
+        - Currently only one argument is supported, multiple arguments must be boundled into separate type definition
+      - `Ret`+ReturnValueName
+        - Only one return value is supported, multiple return values must be boundled into separate type definition
 - Currently event dispatch needs an explicit export from host language binding library (that links/boundles nim library).
   - It seems a better option to pass the fn pointer with the correct signature in nim library init function and use it dynamically.
 - 

@@ -69,9 +69,9 @@ int main(int argc, char *argv[])
                 }
                 return peers.size();
             })
-            .or_else([](const ApiError& err) -> tl::expected<std::size_t, ApiError> {
+            .or_else([](const ApiError& err) -> ApiResult<std::size_t> {
                 std::cerr << "CPP side>Failed to get peers: " << err.desc << " (code " << err.code << ")" << std::endl;
-                return tl::unexpected(err);
+                return ApiUnexpected(err);
             });
 
         if (peerCountResult) {

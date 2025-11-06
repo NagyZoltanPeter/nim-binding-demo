@@ -1,7 +1,8 @@
-import std/[macros, tables, typetraits]
+import std/[macros, tables, typetraits, strutils]
 import results
 import protobuf_serialization
 import thread_data_exchange, serde
+import gen_cpp/generator as cppgen
 
 type
   FfiEntry* = object
@@ -11,6 +12,15 @@ type
 type
   FFILookupTable* = TableRef[string, FfiEntry]
 var ffiTable*: FFILookupTable  = newTable[string, FfiEntry]()
+var generatedCppSnippets*: seq[string] = @[]
+
+proc emitAllGeneratedCpp*(outPath: string = "") =
+  when defined(emitCpp):
+    if generatedCppSnippets.len == 0:
+      echo "emitAllGeneratedCpp: no snippets collected"
+    let body = generatedCppSnippets.join("\n\n")
+    cppgen.emitCppSnippet(outPath, body, append = false)
+
 
 macro ffi*(procDef: untyped): untyped =
   if procDef.kind != nnkProcDef:
@@ -76,12 +86,22 @@ macro ffi*(procDef: untyped): untyped =
           except Exception:
             echo "FFI target proc raised (unknown): ", getCurrentExceptionMsg()
       )
+    # Generate C++ wrapper snippet (zero-arg)
+    let cppSnippet = cppgen.gen_cpp_api_interface(nameStr, "", "", repr(okReturnType))
+    debugEcho "Generated C++ API wrapper (", nameStr, "):\n", cppSnippet
+    let snippetLit = newLit(cppSnippet)
+    let addSnippetStmt = quote do:
+      when defined(emitCpp):
+        generatedCppSnippets.add(`snippetLit`)
+    registerStmt = newStmtList(registerStmt, addSnippetStmt)
   elif params.len == 2:
     # Single-argument proc
     let identDefs = params[1]
     if identDefs.kind != nnkIdentDefs or identDefs.len < 3:
       error "Unexpected parameter AST form in proc " & nameStr
     let paramTypeNode = identDefs[1]
+    let paramNameNode = identDefs[0]
+    let paramNameStr = $paramNameNode
     let paramTypeNameLit = newLit($paramTypeNode)
     registerStmt = quote do:
       # TODO: find out how to call chronicles log macro inside a macro... (macros.nim defines same name compile time loggings)
@@ -107,6 +127,14 @@ macro ffi*(procDef: untyped): untyped =
           except Exception:
             echo "FFI target proc raised (unknown): ", getCurrentExceptionMsg()
       )
+    # Generate C++ wrapper snippet (one-arg)
+    let cppSnippet = cppgen.gen_cpp_api_interface(nameStr, repr(paramTypeNode), paramNameStr, repr(okReturnType))
+    debugEcho "Generated C++ API wrapper (", nameStr, "):\n", cppSnippet
+    let snippetLit = newLit(cppSnippet)
+    let addSnippetStmt = quote do:
+      when defined(emitCpp):
+        generatedCppSnippets.add(`snippetLit`)
+    registerStmt = newStmtList(registerStmt, addSnippetStmt)
   else:
     error "FFI proc '" & nameStr & "' must have zero or one parameter"
 
