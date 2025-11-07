@@ -16,7 +16,7 @@ sequenceDiagram
     CPP->>CppBind: cpp_binding_initialize()
     activate CppBind
     CppBind->>CppBind: GOOGLE_PROTOBUF_VERIFY_VERSION
-    CppBind->>NimReq: libnimdemo_initialize()
+    CppBind->>NimReq: nimlib_initialize()
     deactivate CppBind
 
     %% App init call
@@ -65,7 +65,7 @@ sequenceDiagram
     %% Teardown
     CPP->>CppBind: cpp_binding_teardown()
     activate CppBind
-    CppBind->>NimReq: libnimdemo_teardown()
+    CppBind->>NimReq: nimlib_teardown()
     CppBind->>CppBind: google::protobuf::ShutdownProtobufLibrary()
     deactivate CppBind
 ```

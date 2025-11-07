@@ -22,8 +22,8 @@ extern "C" {
     // void deallocateArgBuffer(void* p);
     fn deallocateArgBuffer(p: *mut c_void);
     // Library lifecycle
-    fn libnimdemo_initialize();
-    fn libnimdemo_teardown();
+    fn nimlib_initialize();
+    fn nimlib_teardown();
 }
 
 // Registry for event handlers
@@ -77,11 +77,11 @@ where
 
 // Initialize/teardown the underlying Nim library (must be called before use)
 pub fn initialize() {
-    unsafe { libnimdemo_initialize() }
+    unsafe { nimlib_initialize() }
 }
 
 pub fn teardown() {
-    unsafe { libnimdemo_teardown() }
+    unsafe { nimlib_teardown() }
 }
 
 // Exported C symbol expected by libnimdemo to deliver events

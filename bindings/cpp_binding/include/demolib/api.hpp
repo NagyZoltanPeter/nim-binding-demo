@@ -18,11 +18,11 @@
 
 void cpp_binding_initialize(void) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    libnimdemo_initialize();
+    nimlib_initialize();
 }
 
 void cpp_binding_teardown(void) {
-    libnimdemo_teardown();
+    nimlib_teardown();
     // Clean up protobuf
     google::protobuf::ShutdownProtobufLibrary();
 }

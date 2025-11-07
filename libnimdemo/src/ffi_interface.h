@@ -9,8 +9,8 @@ extern "C" {
 #endif
 
 // Library initialization and cleanup functions (must be called explicitly)
-void libnimdemo_initialize(void);
-void libnimdemo_teardown(void);
+void nimlib_initialize(void);
+void nimlib_teardown(void);
 
 enum ApiCallResultCode {
 	NIMAPI_FAIL = -1,

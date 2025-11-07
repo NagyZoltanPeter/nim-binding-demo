@@ -123,14 +123,14 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
   return returnCode
 
 # Public API functions following Google Protobuf pattern
-proc libnimdemo_initialize*() {.dynlib, exportc, cdecl.} =
+proc nimlib_initialize*() {.dynlib, exportc, cdecl.} =
   ## Initialize the libnimdemo library. Must be called before using any other libnimdemo functions.
   ## This is equivalent to initDemoLib() but follows the explicit initialization pattern.
   initializeLibrary()
   createRequestDispatcherEnv()
   createEventDispatcherEnv()
 
-proc libnimdemo_teardown*() {.dynlib, exportc, cdecl.} =
+proc nimlib_teardown*() {.dynlib, exportc, cdecl.} =
   ## Cleanup the libnimdemo library. Should be called when done using the library.
   ## This is equivalent to stopDemoLib() but follows the explicit teardown pattern.
   shutdownRequestDispatcher()
