@@ -1,11 +1,14 @@
-import std/[options, atomics, tables]
+import std/[options, atomics, tables, locks]
 import chronicles
 import chronos, chronos/threadsync
 import lockfreequeues
 import protobuf_serialization
 import thread_data_exchange, ffi
 
-var requestDispatcherEnvInitialized: AtomicFlag
+var registryInitialized: AtomicFlag
+var registryLock: Lock
+var ctxByHandle*: Table[uint64, ptr RequestContext]
+var nextHandle: uint64
 
 # Queue for incoming requests (multi-producer, single-consumer)
 type RequestContext* = object
@@ -18,12 +21,17 @@ type RequestContext* = object
   readyToProcessRequestsSignal: ThreadSignalPtr
   syncCallWaiter*: ThreadSignalPtr
   syncCallResponse*: Atomic[ptr ApiResponse]
+  userRef*: pointer
+  userFinalizer*: proc (p: pointer) {.gcsafe.}
 
+proc ensureRegistryInit() =
+  if not registryInitialized.testAndSet():
+    initLock(registryLock)
+    ctxByHandle = initTable[uint64, ptr RequestContext]()
+    # Start handles at 1 so that 0 can represent "no handle"
+    nextHandle = 1'u64
 
-
-var requestContextP*: ptr RequestContext
-
-proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
+proc createRequestContext*(ffiLookupTable: FFILookupTable, userRef: pointer = nil, userFinalizer: proc(p: pointer) {.gcsafe.} = nil): ptr RequestContext =
   result = RequestContext.createShared()
   result.ffiLookupTable = ffiLookupTable
   result.requestSignal = ThreadSignalPtr.new().valueOr:
@@ -38,11 +46,18 @@ proc createRequestContext*(ffiLookupTable: FFILookupTable): ptr RequestContext =
     error "Cannot create sync call signaling"
     quit(QuitFailure)
   result.syncCallResponse.store(nil)
+  result.userRef = userRef
+  result.userFinalizer = userFinalizer
 
 
 proc destroyRequestContext(ctx: ptr RequestContext) =
   if ctx != nil:
     discard ctx[].requestSignal.close()
+    if ctx[].userFinalizer != nil and ctx[].userRef != nil:
+      try:
+        ctx[].userFinalizer(ctx[].userRef)
+      except CatchableError as e:
+        error "userFinalizer raised", err = e.msg
     freeShared(ctx)
 
 # Dispatcher: look up and invoke
@@ -62,10 +77,10 @@ proc dispatchFFIRequest*(ctx: ptr RequestContext, req: ApiCallRequest) {.raises:
     let response = ApiResponse.createShared(NIMAPI_FAIL)
     if req.invokeType == AsyncCall:
         info "Async dispatch", request = req.req
-        entry.invoke(req.argBuffer, req.argLen, response[], AsyncCall)
+        entry.invoke(ctx[].userRef, req.argBuffer, req.argLen, response[], AsyncCall)
     else: # sync call
       info "Synch dispatch", request = req.req
-      entry.invoke(req.argBuffer, req.argLen, response[], SyncCall)
+      entry.invoke(ctx[].userRef, req.argBuffer, req.argLen, response[], SyncCall)
       ctx[].syncCallResponse.store(response)
       ctx[].syncCallWaiter.fireSync().isOkOr:
         error "Failed to send response", name = req.req
@@ -100,37 +115,69 @@ proc dispatcherThreadProc(ctx: ptr RequestContext) {.thread, gcsafe.} =
 
   info "Dispatcher thread stopping"
 
-proc createRequestDispatcherEnv*() =
-  # do it once
-  if not requestDispatcherEnvInitialized.testAndSet():
-    info "Initializing run environment"
+# Registry management and context lifecycle (handle-based)
 
-    # Initialize thread running flag
-    requestContextP = createRequestContext(ffiTable)
-    # Start the dispatcher thread
-    try:
-      info "About to create dispatcher thread"
-      createThread(requestContextP[].dispatcherThread, dispatcherThreadProc, requestContextP)
-      info "Dispatcher thread created successfully"
-    except ValueError, ResourceExhaustedError:
-      error "Failed to create dispatcher thread"
-      destroyRequestContext(requestContextP)
+proc registerContext(ctx: ptr RequestContext): uint64 =
+  ensureRegistryInit()
+  withLock(registryLock):
+    let handle = nextHandle
+    inc nextHandle
+    ctxByHandle[handle] = ctx
+    return handle
 
-proc shutdownRequestDispatcher*() =
-  info "Stopping request dispatcher thread"
-  requestContextP[].requestDispatcherShallRun.store(false)
-  discard requestContextP[].requestSignal.fireSync()
-  joinThread(requestContextP[].dispatcherThread)
-  destroyRequestContext(requestContextP)
+proc unregisterContext(handle: uint64): ptr RequestContext =
+  ensureRegistryInit()
+  withLock(registryLock):
+    if ctxByHandle.hasKey(handle):
+      let ctx = ctxByHandle[handle]
+      ctxByHandle.del(handle)
+      return ctx
+    return nil
 
-proc waitForRequestProcessingReady*(): bool =
-  if requestContextP == nil:
+proc getContext*(handle: uint64): ptr RequestContext =
+  ensureRegistryInit()
+  withLock(registryLock):
+    return ctxByHandle.getOrDefault(handle, nil)
+
+proc createContext*(userRef: pointer = nil, userFinalizer: proc(p: pointer) {.gcsafe.} = nil): uint64 =
+  let ctx = createRequestContext(ffiTable, userRef, userFinalizer)
+  return registerContext(ctx)
+
+proc startContext*(handle: uint64): bool =
+  let ctx = getContext(handle)
+  if ctx.isNil: return false
+  try:
+    info "About to create dispatcher thread", handle = handle
+    createThread(ctx[].dispatcherThread, dispatcherThreadProc, ctx)
+    info "Dispatcher thread created successfully", handle = handle
+    return true
+  except ValueError, ResourceExhaustedError:
+    error "Failed to create dispatcher thread", handle = handle
+    return false
+
+proc stopContext*(handle: uint64): bool =
+  let ctx = getContext(handle)
+  if ctx.isNil: return false
+  info "Stopping request dispatcher thread", handle = handle
+  ctx[].requestDispatcherShallRun.store(false)
+  discard ctx[].requestSignal.fireSync()
+  joinThread(ctx[].dispatcherThread)
+  return true
+
+proc destroyContext*(handle: uint64): bool =
+  let ctx = unregisterContext(handle)
+  if ctx.isNil: return false
+  destroyRequestContext(ctx)
+  return true
+
+proc waitForRequestProcessingReady*(ctx: ptr RequestContext, timeout = 10.seconds): bool =
+  if ctx.isNil:
     error "Request context is not yet initialized"
     return false
-  if requestContextP[].readyToProcessRequests.load():
+  if ctx[].readyToProcessRequests.load():
       return true
   info "Waiting for request processing to be ready"
-  result = requestContextP[].readyToProcessRequestsSignal.waitSync(10.seconds).valueOr:
+  result = ctx[].readyToProcessRequestsSignal.waitSync(timeout).valueOr:
     error "Having issue waiting for request processing to be ready", error = error
     return false
   info "Request processing ready"

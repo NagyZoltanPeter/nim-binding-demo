@@ -1,3 +1,5 @@
+#pragma once
+
 #ifndef __libnimdemo__
 #define __libnimdemo__
 

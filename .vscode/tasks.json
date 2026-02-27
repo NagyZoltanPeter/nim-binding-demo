@@ -66,6 +66,30 @@
 			"type": "shell",
 			"command": "cd libnimdemo && nimble buildlib",
 			"group": "build"
+		},
+		{
+			"label": "build libnimdemo",
+			"type": "shell",
+			"command": "cd libnimdemo && nimble buildlib",
+			"group": "build"
+		},
+		{
+			"label": "build libnimdemo",
+			"type": "shell",
+			"command": "cd libnimdemo && nimble buildlib",
+			"group": "build"
+		},
+		{
+			"label": "build libnimdemo",
+			"type": "shell",
+			"command": "cd libnimdemo && nimble buildlib",
+			"group": "build"
+		},
+		{
+			"label": "build libnimdemo",
+			"type": "shell",
+			"command": "cd libnimdemo && nimble buildlib",
+			"group": "build"
 		}
 	]
 }

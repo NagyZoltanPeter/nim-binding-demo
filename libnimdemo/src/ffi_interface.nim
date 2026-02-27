@@ -5,7 +5,7 @@ import lockfreequeues
 import protobuf_serialization
 import taskpools/channels_spsc_single
 
-import request_dispatcher, thread_data_exchange
+import context, thread_data_exchange
 import event_dispatcher
 import api
 
@@ -44,10 +44,16 @@ proc allocateArgBuffer*(argLen: cint): pointer {.dynlib, exportc, cdecl.} =
 proc deallocateArgBuffer*(argBuffer: pointer) {.dynlib, exportc, cdecl.} =  
   if argBuffer != nil: deallocShared(argBuffer)
 
-proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynlib, exportc, cdecl.} =
+proc asyncApiCall*(ctxHandle: uint64, req: cstring, argBuffer: pointer, argLen: cint): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Async API call", req = reqStr, argLen = argLen
-  if not (isInitialized() and waitForRequestProcessingReady()):
+  if not isInitialized():
+    error "Library not initialized, cannot process request", request = reqStr
+    deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_NOT_INITIALIZED
+
+  let ctx = getContext(ctxHandle)
+  if ctx.isNil or not waitForRequestProcessingReady(ctx):
     error "Library not initialized, cannot process request", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_NOT_INITIALIZED
@@ -56,25 +62,31 @@ proc asyncApiCall*(req: cstring, argBuffer: pointer, argLen: cint): cint {.dynli
   # Create request item
   let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), invokeType: AsyncCall)
 
-  let producer =   requestContextP[].incomingQueue.getProducer()
+  let producer =   ctx[].incomingQueue.getProducer()
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_QUEUE_FULL
   else:
-    info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
-    discard requestContextP[].requestSignal.fireSync()
+    info "request pushed", request = reqStr, incomingQueueLen = $ctx[].incomingQueue.storage.len
+    discard ctx[].requestSignal.fireSync()
 
   return NIMAPI_OK
 
 var threadResponseChannel {.threadvar.} : ChannelSPSCSingle[ptr ApiResponse]
 zeroMem(addr threadResponseChannel, sizeof(ChannelSPSCSingle[ptr ApiResponse]))
 
-proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint, 
+proc syncApiCall*(ctxHandle: uint64, req: cstring, argBuffer: pointer, argLen: cint, 
                   respBuffer: var pointer, respLen: var cint, errorDesc: var cstring): cint {.dynlib, exportc, cdecl.} =
   let reqStr = $req
   info "Sync API call", req = reqStr, argLen = argLen
-  if not (isInitialized() and waitForRequestProcessingReady()):
+  if not isInitialized():
+    error "Library not initialized, cannot process request", request = reqStr
+    deallocateArgBuffer(argBuffer)
+    return NIMAPI_ERR_NOT_INITIALIZED
+
+  let ctx = getContext(ctxHandle)
+  if ctx.isNil or not waitForRequestProcessingReady(ctx):
     error "Library not initialized, cannot process request", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_NOT_INITIALIZED
@@ -86,18 +98,18 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
   # Create request item
   let item = ApiCallRequest(req: reqStr, argBuffer: argBuffer, argLen: int(argLen), invokeType: SyncCall)
 
-  let producer =   requestContextP[].incomingQueue.getProducer()
+  let producer =   ctx[].incomingQueue.getProducer()
   if not producer.push(item):
     info "Failed to enqueue request, queue might be full", request = reqStr
     deallocateArgBuffer(argBuffer)
     return NIMAPI_ERR_QUEUE_FULL
   else:
-    info "request pushed", request = reqStr, incomingQueueLen = $requestContextP[].incomingQueue.storage.len
-    discard requestContextP[].requestSignal.fireSync()
+    info "request pushed", request = reqStr, incomingQueueLen = $ctx[].incomingQueue.storage.len
+    discard ctx[].requestSignal.fireSync()
 
   var callResult : ptr ApiResponse
-  requestContextP[].syncCallResponse.store(nil)
-  let recvOk = requestContextP[].syncCallWaiter.waitSync(10.seconds).valueOr:
+  ctx[].syncCallResponse.store(nil)
+  let recvOk = ctx[].syncCallWaiter.waitSync(10.seconds).valueOr:
     error "Failed to wait for sync call response", request = reqStr
     return NIMAPI_ERR_NO_ANSWER
 
@@ -105,7 +117,7 @@ proc syncApiCall*(req: cstring, argBuffer: pointer, argLen: cint,
     error "Timed out waiting for sync call", request = reqStr
     return NIMAPI_ERR_NO_ANSWER
   else:
-    callResult = requestContextP[].syncCallResponse.load()
+  callResult = ctx[].syncCallResponse.load()
     if callResult == nil:
       error "Received nil response for sync call", request = reqStr
       return NIMAPI_ERR_NO_ANSWER
@@ -127,11 +139,34 @@ proc nimlib_initialize*() {.dynlib, exportc, cdecl.} =
   ## Initialize the libnimdemo library. Must be called before using any other libnimdemo functions.
   ## This is equivalent to initDemoLib() but follows the explicit initialization pattern.
   initializeLibrary()
-  createRequestDispatcherEnv()
+  # Do not create any request contexts or threads here; callers do that explicitly.
   createEventDispatcherEnv()
 
 proc nimlib_teardown*() {.dynlib, exportc, cdecl.} =
   ## Cleanup the libnimdemo library. Should be called when done using the library.
   ## This is equivalent to stopDemoLib() but follows the explicit teardown pattern.
-  shutdownRequestDispatcher()
+  # Request contexts must be explicitly stopped and destroyed by the caller.
   shutdownEventDispatcher()
+
+# Back-compat shims using a default context handle
+## Backward compatibility shims removed: callers must explicitly manage contexts and use
+## nimlib_async_call / nimlib_sync_call with a handle obtained from nimlib_context_create.
+
+# Context management exported API
+proc nimlib_context_create*(userRef: pointer = nil): uint64 {.dynlib, exportc, cdecl.} =
+  return createContext(userRef)
+
+proc nimlib_context_start*(ctxHandle: uint64): cint {.dynlib, exportc, cdecl.} =
+  return (if startContext(ctxHandle): NIMAPI_OK else: NIMAPI_FAIL)
+
+proc nimlib_context_stop*(ctxHandle: uint64): cint {.dynlib, exportc, cdecl.} =
+  return (if stopContext(ctxHandle): NIMAPI_OK else: NIMAPI_FAIL)
+
+proc nimlib_context_destroy*(ctxHandle: uint64): cint {.dynlib, exportc, cdecl.} =
+  return (if destroyContext(ctxHandle): NIMAPI_OK else: NIMAPI_FAIL)
+
+proc nimlib_context_wait_ready*(ctxHandle: uint64, timeoutMs: cint): bool {.dynlib, exportc, cdecl.} =
+  let ctx = getContext(ctxHandle)
+  if ctx.isNil: return false
+  let dur = milliseconds(int64(timeoutMs))
+  return waitForRequestProcessingReady(ctx, dur)

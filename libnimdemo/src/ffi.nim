@@ -7,7 +7,7 @@ import gen_cpp/generator as cppgen
 type
   FfiEntry* = object
     paramTypeName*: string
-    invoke*: proc (buffer: pointer, len: int, result: var ApiResponse, call: InvokeType) {.gcsafe.}
+    invoke*: proc (user: pointer, buffer: pointer, len: int, result: var ApiResponse, call: InvokeType) {.gcsafe.}
 
 type
   FFILookupTable* = TableRef[string, FfiEntry]
@@ -73,7 +73,7 @@ macro ffi*(procDef: untyped): untyped =
     registerStmt = quote do:
       ffiTable[`nameLit`] = FfiEntry(
         paramTypeName: `paramTypeNameLit`,
-        invoke: proc (buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
+        invoke: proc (user: pointer, buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
           if not buffer.isNil:
             echo "FFI target proc does not accepts argument and shall not be provided"
             deallocShared(buffer)
@@ -107,7 +107,7 @@ macro ffi*(procDef: untyped): untyped =
       # TODO: find out how to call chronicles log macro inside a macro... (macros.nim defines same name compile time loggings)
       ffiTable[`nameLit`] = FfiEntry(
         paramTypeName: `paramTypeNameLit`,
-        invoke: proc (buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
+        invoke: proc (user: pointer, buffer: pointer, len: int, `responseSym`: var ApiResponse, call: InvokeType) {.gcsafe, raises: [].} =
           `responseSym`.buffer = nil
           `responseSym`.len = 0
           `responseSym`.return_code = NIMAPI_FAIL
