@@ -2,10 +2,10 @@ inline ApiCallResultCode init() {
     void* resultBuffer = nullptr;
     int resultLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("init", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "init", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
-        deallocateArgBuffer(errorDesc);
+        if (errorDesc) { deallocateArgBuffer(errorDesc); }
         std::cerr << "Api call error: " << static_cast<int>(result) << " # " << errorMsg << std::endl;
     }
     if (resultBuffer) { deallocateArgBuffer(resultBuffer); }
@@ -21,7 +21,7 @@ inline ApiCallResultCode send(const WakuMessage& msg) {
         deallocateArgBuffer(argBuffer);
         return ApiCallResultCode::NIMAPI_FAIL;
     }
-    return (ApiCallResultCode)asyncApiCall("send", argBuffer, sizeRequired);
+    return (ApiCallResultCode)asyncApiCall(require_cpp_binding_context(), "send", argBuffer, sizeRequired);
     // Ownership of argBuffer is transferred to the Nim library.
 
 }
@@ -31,7 +31,7 @@ inline ApiResult<std::vector<std::string>> getPeers() {
     void* returnBuffer = nullptr;
     int returnLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("getPeers", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "getPeers", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
         if (errorDesc) { deallocateArgBuffer(errorDesc); }

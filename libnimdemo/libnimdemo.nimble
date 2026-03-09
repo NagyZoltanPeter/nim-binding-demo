@@ -14,7 +14,7 @@ requires "nim >= 2.2.4",
   "stew",
   "faststreams",
   "serialization",
-  "protobuf_serialization", # waiting for this to be in a release
+  "protobuf_serialization#039007fda3731b695a9a64234c890eca28afef11", # waiting for this to be in a release
   "unittest2",
   "chronicles",
   "confutils",

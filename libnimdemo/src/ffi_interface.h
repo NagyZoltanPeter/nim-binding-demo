@@ -25,9 +25,16 @@ enum ApiCallResultCode {
 };
 
 
-// Main API function
-int asyncApiCall(const char* req, void* argBuffer, int argLen);
-int syncApiCall(const char* req, void* argBuffer, int argLen, void** respBuffer, int* respLen, char** errorDesc );
+// Context management
+uint64_t nimlib_context_create(void* userRef);
+int nimlib_context_start(uint64_t ctxHandle);
+int nimlib_context_stop(uint64_t ctxHandle);
+int nimlib_context_destroy(uint64_t ctxHandle);
+bool nimlib_context_wait_ready(uint64_t ctxHandle, int timeoutMs);
+
+// Main API functions
+int asyncApiCall(uint64_t ctxHandle, const char* req, void* argBuffer, int argLen);
+int syncApiCall(uint64_t ctxHandle, const char* req, void* argBuffer, int argLen, void** respBuffer, int* respLen, char** errorDesc );
 
 void* allocateArgBuffer(int size);
 void  deallocateArgBuffer(void* argBuffer);

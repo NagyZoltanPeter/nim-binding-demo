@@ -56,10 +56,10 @@ proc gen_cpp_api_interface*(procName: string, argType: string, argName: string, 
     void* resultBuffer = nullptr;
     int resultLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("%NAME%", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "%NAME%", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
-        deallocateArgBuffer(errorDesc);
+        if (errorDesc) { deallocateArgBuffer(errorDesc); }
         std::cerr << "Api call error: " << static_cast<int>(result) << " # " << errorMsg << std::endl;
     }
     if (resultBuffer) { deallocateArgBuffer(resultBuffer); }
@@ -72,7 +72,7 @@ proc gen_cpp_api_interface*(procName: string, argType: string, argName: string, 
     void* returnBuffer = nullptr;
     int returnLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("%NAME%", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "%NAME%", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
         if (errorDesc) { deallocateArgBuffer(errorDesc); }
@@ -101,12 +101,12 @@ proc gen_cpp_api_interface*(procName: string, argType: string, argName: string, 
         deallocateArgBuffer(argBuffer);
         return ApiCallResultCode::NIMAPI_FAIL;
     }
-    return (ApiCallResultCode)asyncApiCall("%NAME%", argBuffer, sizeRequired);
+    return (ApiCallResultCode)asyncApiCall(require_cpp_binding_context(), "%NAME%", argBuffer, sizeRequired);
     // Ownership of argBuffer is transferred to the Nim library.
 """
       ser = ser.replace("%ARG%", an)
     else:
-      ser = "return (ApiCallResultCode)asyncApiCall(\"%NAME%\", nullptr, 0);\n"
+      ser = "return (ApiCallResultCode)asyncApiCall(require_cpp_binding_context(), \"%NAME%\", nullptr, 0);\n"
     result = ("""inline ApiCallResultCode %NAME%(const %ARGTYPE%& %ARGNAME%) {
     %SER%
 }

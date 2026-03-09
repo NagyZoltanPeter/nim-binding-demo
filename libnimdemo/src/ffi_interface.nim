@@ -117,7 +117,7 @@ proc syncApiCall*(ctxHandle: uint64, req: cstring, argBuffer: pointer, argLen: c
     error "Timed out waiting for sync call", request = reqStr
     return NIMAPI_ERR_NO_ANSWER
   else:
-  callResult = ctx[].syncCallResponse.load()
+    callResult = ctx[].syncCallResponse.load()
     if callResult == nil:
       error "Received nil response for sync call", request = reqStr
       return NIMAPI_ERR_NO_ANSWER

@@ -15,13 +15,43 @@
 
 // ToDo: find proper place for this def
 #include "demolib/api_result.hpp"
+#include <stdexcept>
+
+inline uint64_t& cpp_binding_context_handle() {
+    static uint64_t handle = 0;
+    return handle;
+}
+
+inline uint64_t require_cpp_binding_context() {
+    const uint64_t handle = cpp_binding_context_handle();
+    if (handle == 0) {
+        throw std::runtime_error("cpp_binding_initialize() must be called before using the C++ API");
+    }
+    return handle;
+}
 
 void cpp_binding_initialize(void) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     nimlib_initialize();
+    auto& handle = cpp_binding_context_handle();
+    if (handle == 0) {
+        handle = nimlib_context_create(nullptr);
+    }
+    if (handle == 0 || nimlib_context_start(handle) != ApiCallResultCode::NIMAPI_OK) {
+        throw std::runtime_error("Failed to create/start Nim request context");
+    }
+    if (!nimlib_context_wait_ready(handle, 10000)) {
+        throw std::runtime_error("Timed out waiting for Nim request context to become ready");
+    }
 }
 
 void cpp_binding_teardown(void) {
+    auto& handle = cpp_binding_context_handle();
+    if (handle != 0) {
+        (void)nimlib_context_stop(handle);
+        (void)nimlib_context_destroy(handle);
+        handle = 0;
+    }
     nimlib_teardown();
     // Clean up protobuf
     google::protobuf::ShutdownProtobufLibrary();
@@ -40,12 +70,13 @@ inline ApiCallResultCode init() {
     void* resultBuffer = nullptr;
     int resultLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("init", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "init", nullptr, 0, &resultBuffer, &resultLen, &errorDesc);
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
-        deallocateArgBuffer(errorDesc);
+        if (errorDesc) { deallocateArgBuffer(errorDesc); }
         std::cerr << "Api call error: " << static_cast<int>(result) << " # " << errorMsg << std::endl;
     }
+    if (resultBuffer) { deallocateArgBuffer(resultBuffer); }
     return static_cast<ApiCallResultCode>(result);
 }
 
@@ -56,7 +87,7 @@ inline ApiCallResultCode send(const WakuMessage& waku_msg, std::function<void(co
     return serializeApiType(waku_msg, argBuffer, bufferSize)
         .and_then([&]() -> expected<ApiCallResultCode, std::string> {
             // Ownership of argBuffer is transferred to the Nim library on success
-            ApiCallResultCode rc = static_cast<ApiCallResultCode>(asyncApiCall("send", argBuffer, static_cast<int>(bufferSize)));
+            ApiCallResultCode rc = static_cast<ApiCallResultCode>(asyncApiCall(require_cpp_binding_context(), "send", argBuffer, static_cast<int>(bufferSize)));
             return expected<ApiCallResultCode, std::string>{ rc };
         })
         .or_else([](const std::string& err) -> expected<ApiCallResultCode, std::string> {
@@ -70,12 +101,12 @@ inline ApiResult<std::vector<std::string>> getPeers() {
     void* returnBuffer = nullptr;
     int returnLen = 0;
     char* errorDesc = nullptr;
-    auto result = syncApiCall("getPeers", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
+    auto result = syncApiCall(require_cpp_binding_context(), "getPeers", nullptr, 0, &returnBuffer, &returnLen, &errorDesc);
 
     if (result != ApiCallResultCode::NIMAPI_OK) {
         std::cerr << "Failed to get peers: " << static_cast<int>(result) << std::endl;
         std::string errorMsg(errorDesc ? errorDesc : "Unknown error");
-        deallocateArgBuffer(errorDesc);
+        if (errorDesc) { deallocateArgBuffer(errorDesc); }
         std::cerr << "Api call error: " << errorMsg << std::endl;
         return ApiUnexpected(ApiError{result, errorMsg});
     }

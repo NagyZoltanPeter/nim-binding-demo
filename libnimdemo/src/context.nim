@@ -5,10 +5,6 @@ import lockfreequeues
 import protobuf_serialization
 import thread_data_exchange, ffi
 
-var registryInitialized: AtomicFlag
-var registryLock: Lock
-var ctxByHandle*: Table[uint64, ptr RequestContext]
-var nextHandle: uint64
 
 # Queue for incoming requests (multi-producer, single-consumer)
 type RequestContext* = object
@@ -23,6 +19,11 @@ type RequestContext* = object
   syncCallResponse*: Atomic[ptr ApiResponse]
   userRef*: pointer
   userFinalizer*: proc (p: pointer) {.gcsafe.}
+
+var registryInitialized: AtomicFlag
+var registryLock: Lock
+var ctxByHandle*: Table[uint64, ptr RequestContext]
+var nextHandle: uint64
 
 proc ensureRegistryInit() =
   if not registryInitialized.testAndSet():
